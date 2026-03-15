@@ -1,0 +1,287 @@
+defmodule Exclosured.Inline do
+  @moduledoc """
+  Define small WASM functions inline in Elixir using `defwasm`.
+
+  The Rust code is compiled to a standalone `.wasm` file at build time.
+  No Cargo workspace, no `.rs` files needed. Just Rust inside Elixir.
+
+  ## Example
+
+      defmodule MyApp.Filters do
+        use Exclosured.Inline
+
+        defwasm :grayscale, args: [pixels: :binary] do
+          \"\"\"
+          for chunk in pixels.chunks_exact_mut(4) {
+              let gray = (0.299 * chunk[0] as f32
+                        + 0.587 * chunk[1] as f32
+                        + 0.114 * chunk[2] as f32) as u8;
+              chunk[0] = gray;
+              chunk[1] = gray;
+              chunk[2] = gray;
+          }
+          \"\"\"
+        end
+      end
+
+  After `mix compile`:
+    - `priv/static/wasm/my_app_filters.wasm` is generated
+    - `MyApp.Filters.wasm_url()` returns `"/wasm/my_app_filters.wasm"`
+    - Functions are callable from the browser via the JS loader
+
+  ## Supported Arg Types
+
+    * `:binary`: allocated in WASM memory, passed as (ptr, len), mutable
+    * `:string`: allocated in WASM memory, passed as (ptr, len), read-only
+    * `:i32`, `:u32`, `:f32`, `:f64`: passed directly as WASM values
+  """
+
+  defmacro __using__(_opts) do
+    quote do
+      import Exclosured.Inline, only: [defwasm: 3]
+      Module.register_attribute(__MODULE__, :__wasm_fns, accumulate: true)
+      @before_compile Exclosured.Inline
+    end
+  end
+
+  @doc """
+  Define an inline WASM function.
+
+  The body must be a string containing Rust code that operates on the
+  declared arguments. The generated Rust function receives proper FFI
+  types automatically based on the arg type declarations.
+
+  ## Options
+
+    * `:args`: keyword list of `name: type` (default: `[]`)
+    * `:return`: return type (default: `:i32`)
+  """
+  defmacro defwasm(name, opts, do: {:__block__, _, [rust_code]})
+           when is_binary(rust_code) do
+    do_defwasm(name, opts, rust_code)
+  end
+
+  defmacro defwasm(name, opts, do: rust_code) when is_binary(rust_code) do
+    do_defwasm(name, opts, rust_code)
+  end
+
+  # Support ~S sigil (no escape interpolation, preserves \" for Rust)
+  defmacro defwasm(name, opts, do: {:sigil_S, _, [{:<<>>, _, [rust_code]}, _]})
+           when is_binary(rust_code) do
+    do_defwasm(name, opts, rust_code)
+  end
+
+  defp do_defwasm(name, opts, rust_code) do
+    quote do
+      @__wasm_fns {
+        unquote(name),
+        unquote(Keyword.get(opts, :args, [])),
+        unquote(Keyword.get(opts, :return, :i32)),
+        unquote(rust_code)
+      }
+    end
+  end
+
+  defmacro __before_compile__(env) do
+    functions = Module.get_attribute(env.module, :__wasm_fns) |> Enum.reverse()
+    module_name = wasm_module_name(env.module)
+    output_dir = Application.get_env(:exclosured, :output_dir, "priv/static/wasm")
+
+    # Compile at build time
+    compile_inline_module(module_name, functions, output_dir)
+
+    # Generate Elixir bindings
+    fn_defs =
+      for {name, args, _ret, _rust} <- functions do
+        arg_names = Keyword.keys(args)
+        arg_vars = Enum.map(arg_names, &Macro.var(&1, nil))
+
+        quote do
+          @doc "Call `#{unquote(name)}` on the client's WASM instance via LiveView."
+          def unquote(name)(socket, unquote_splicing(arg_vars)) do
+            Exclosured.LiveView.call(
+              socket,
+              unquote(String.to_atom(module_name)),
+              unquote(to_string(name)),
+              [unquote_splicing(arg_vars)]
+            )
+          end
+        end
+      end
+
+    meta =
+      quote do
+        @doc "URL path to the compiled .wasm file."
+        def wasm_url, do: unquote("/wasm/#{module_name}.wasm")
+
+        @doc "Filesystem path to the compiled .wasm file."
+        def wasm_path, do: unquote("#{output_dir}/#{module_name}.wasm")
+
+        @doc "Module name used for the .wasm file."
+        def wasm_module_name, do: unquote(module_name)
+
+        @doc "List of exported WASM function names."
+        def wasm_exports do
+          unquote(Enum.map(functions, fn {name, _, _, _} -> name end))
+        end
+      end
+
+    [meta | fn_defs]
+  end
+
+  # --- Compile-time helpers ---
+
+  defp wasm_module_name(module) do
+    module
+    |> Module.split()
+    |> Enum.map_join("_", &Macro.underscore/1)
+  end
+
+  defp compile_inline_module(module_name, functions, output_dir) do
+    crate_dir = Path.join([Mix.Project.build_path(), "exclosured_inline", module_name])
+    src_dir = Path.join(crate_dir, "src")
+    File.mkdir_p!(src_dir)
+
+    # Write Cargo.toml
+    File.write!(Path.join(crate_dir, "Cargo.toml"), """
+    [package]
+    name = "#{module_name}"
+    version = "0.1.0"
+    edition = "2021"
+
+    [lib]
+    crate-type = ["cdylib"]
+
+    [profile.release]
+    opt-level = "z"
+    lto = true
+    """)
+
+    # Write lib.rs with all functions
+    rust_source = generate_lib_rs(functions)
+    lib_rs_path = Path.join(src_dir, "lib.rs")
+
+    # Only recompile if source changed
+    needs_compile =
+      case File.read(lib_rs_path) do
+        {:ok, existing} -> existing != rust_source
+        _ -> true
+      end
+
+    if needs_compile do
+      File.write!(lib_rs_path, rust_source)
+
+      target_dir = Path.join(crate_dir, "target")
+
+      Mix.shell().info("Compiling inline WASM module: #{module_name}")
+
+      case System.cmd(
+             "cargo",
+             [
+               "build",
+               "--target",
+               "wasm32-unknown-unknown",
+               "--release",
+               "--manifest-path",
+               Path.join(crate_dir, "Cargo.toml")
+             ],
+             stderr_to_stdout: true,
+             into: IO.stream(:stdio, :line),
+             env: [{"CARGO_TARGET_DIR", target_dir}]
+           ) do
+        {_, 0} ->
+          wasm_src =
+            Path.join([target_dir, "wasm32-unknown-unknown", "release", "#{module_name}.wasm"])
+
+          File.mkdir_p!(output_dir)
+          dest = Path.join(output_dir, "#{module_name}.wasm")
+          File.cp!(wasm_src, dest)
+          size = File.stat!(dest).size
+          Mix.shell().info("  #{dest} (#{div(size, 1024)} KB)")
+
+        {_, code} ->
+          Mix.raise("Failed to compile inline WASM module #{module_name} (exit code: #{code})")
+      end
+    end
+  end
+
+  defp generate_lib_rs(functions) do
+    fn_code =
+      functions
+      |> Enum.map(fn {name, args, _ret, rust_code} ->
+        {params, setup} = build_ffi(args)
+
+        """
+        #[no_mangle]
+        pub extern "C" fn #{name}(#{params}) -> i32 {
+        #{setup}
+        #{indent(rust_code, 4)}
+            0
+        }
+        """
+      end)
+      |> Enum.join("\n")
+
+    """
+    // Auto-generated by Exclosured.Inline. Do not edit.
+
+    #[no_mangle]
+    pub extern "C" fn alloc(size: usize) -> *mut u8 {
+        let mut buf = Vec::with_capacity(size);
+        let ptr = buf.as_mut_ptr();
+        core::mem::forget(buf);
+        ptr
+    }
+
+    #[no_mangle]
+    pub extern "C" fn dealloc(ptr: *mut u8, size: usize) {
+        unsafe { drop(Vec::from_raw_parts(ptr, 0, size)); }
+    }
+
+    #{fn_code}
+    """
+  end
+
+  defp build_ffi(args) do
+    params =
+      args
+      |> Enum.flat_map(fn
+        {name, :binary} -> [{"#{name}_ptr", "*mut u8"}, {"#{name}_len", "usize"}]
+        {name, :string} -> [{"#{name}_ptr", "*const u8"}, {"#{name}_len", "usize"}]
+        {name, type} -> [{"#{name}", to_rust_type(type)}]
+      end)
+      |> Enum.map(fn {n, t} -> "#{n}: #{t}" end)
+      |> Enum.join(", ")
+
+    setup =
+      args
+      |> Enum.map(fn
+        {name, :binary} ->
+          "    let #{name} = unsafe { core::slice::from_raw_parts_mut(#{name}_ptr, #{name}_len) };"
+
+        {name, :string} ->
+          "    let #{name} = unsafe { core::str::from_utf8_unchecked(core::slice::from_raw_parts(#{name}_ptr, #{name}_len)) };"
+
+        _ ->
+          ""
+      end)
+      |> Enum.reject(&(&1 == ""))
+      |> Enum.join("\n")
+
+    {params, setup}
+  end
+
+  defp to_rust_type(:i32), do: "i32"
+  defp to_rust_type(:u32), do: "u32"
+  defp to_rust_type(:f32), do: "f32"
+  defp to_rust_type(:f64), do: "f64"
+
+  defp indent(code, spaces) do
+    pad = String.duplicate(" ", spaces)
+
+    code
+    |> String.trim()
+    |> String.split("\n")
+    |> Enum.map_join("\n", &"#{pad}#{&1}")
+  end
+end

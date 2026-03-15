@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="csrf-token" content={Phoenix.Controller.get_csrf_token()} />
+    <title>Latency Comparison - Exclosured</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body {
+        font-family: system-ui, -apple-system, sans-serif;
+        max-width: 700px;
+        margin: 0 auto;
+        padding: 2rem;
+        background: #0a0a1a;
+        color: #eee;
+      }
+      h1 { margin-bottom: 0.3rem; color: #00d2ff; font-size: 1.6rem; }
+      p.desc { color: #888; margin-bottom: 1.5rem; font-size: 0.9rem; line-height: 1.4; }
+
+      /* Mode toggle */
+      .mode-toggle {
+        display: flex;
+        gap: 0;
+        margin-bottom: 1.2rem;
+        border-radius: 8px;
+        overflow: hidden;
+        border: 1px solid #333;
+        width: fit-content;
+      }
+      .mode-btn {
+        padding: 0.6rem 1.2rem;
+        background: #1a1a2e;
+        color: #888;
+        border: none;
+        cursor: pointer;
+        font-size: 0.9rem;
+        font-family: inherit;
+        transition: background 0.15s, color 0.15s;
+      }
+      .mode-btn:hover { background: #252540; }
+      .mode-btn.active {
+        background: #00d2ff;
+        color: #0a0a1a;
+        font-weight: 600;
+      }
+      .mode-btn + .mode-btn { border-left: 1px solid #333; }
+
+      /* Sliders */
+      .sliders {
+        display: flex;
+        gap: 2rem;
+        margin-bottom: 1.2rem;
+        flex-wrap: wrap;
+      }
+      .slider-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.3rem;
+      }
+      .slider-group label {
+        color: #aaa;
+        font-size: 0.85rem;
+      }
+      .slider-group input[type="range"] {
+        width: 220px;
+        accent-color: #00d2ff;
+      }
+      .slider-value {
+        color: #00d2ff;
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+        min-width: 2.5em;
+        display: inline-block;
+        text-align: right;
+      }
+
+      /* Canvas */
+      .canvas-wrap {
+        margin-bottom: 1rem;
+      }
+      canvas {
+        border: 1px solid #333;
+        border-radius: 8px;
+        display: block;
+        image-rendering: pixelated;
+      }
+
+      /* Latency display */
+      .latency-bar {
+        background: #1a1a2e;
+        border: 1px solid #333;
+        border-radius: 8px;
+        padding: 1rem 1.2rem;
+        margin-top: 0.5rem;
+      }
+      .latency-bar .label {
+        font-size: 0.8rem;
+        color: #888;
+        margin-bottom: 0.3rem;
+      }
+      .latency-bar .value {
+        font-size: 1.8rem;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+      }
+      .latency-bar .value.fast { color: #00e676; }
+      .latency-bar .value.slow { color: #ff5252; }
+      .latency-bar .value.none { color: #555; }
+      .latency-bar .unit { font-size: 0.9rem; font-weight: 400; color: #888; }
+      .latency-bar .hint {
+        font-size: 0.75rem;
+        color: #666;
+        margin-top: 0.3rem;
+      }
+
+      /* Loading */
+      .loading { color: #666; font-size: 0.85rem; margin-top: 0.5rem; }
+    </style>
+  </head>
+  <body>
+    <%= @inner_content %>
+    <script defer phx-track-static src={"/assets/app.js"}></script>
+  </body>
+</html>

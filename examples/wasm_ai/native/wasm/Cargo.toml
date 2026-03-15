@@ -1,0 +1,3 @@
+[workspace]
+members = ["text_engine"]
+resolver = "2"

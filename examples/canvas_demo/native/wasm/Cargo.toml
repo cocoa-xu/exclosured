@@ -1,0 +1,3 @@
+[workspace]
+members = ["renderer"]
+resolver = "2"

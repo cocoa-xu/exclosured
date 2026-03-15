@@ -1,0 +1,3 @@
+[workspace]
+members = ["sync_client"]
+resolver = "2"

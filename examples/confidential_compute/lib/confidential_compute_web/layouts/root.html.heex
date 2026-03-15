@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="csrf-token" content={Phoenix.Controller.get_csrf_token()} />
+    <title>Confidential Computation - Exclosured</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body {
+        font-family: system-ui, -apple-system, sans-serif;
+        background: #0f0f23;
+        color: #e0e0e0;
+        min-height: 100vh;
+      }
+      .container {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 2rem 1.5rem;
+      }
+      .header {
+        text-align: center;
+        margin-bottom: 2.5rem;
+      }
+      .header h1 {
+        font-size: 2rem;
+        color: #7bed9f;
+        margin-bottom: 0.5rem;
+      }
+      .header p {
+        color: #888;
+        font-size: 1rem;
+        max-width: 640px;
+        margin: 0 auto;
+        line-height: 1.5;
+      }
+      .panels {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 2rem;
+      }
+      @media (max-width: 768px) {
+        .panels { grid-template-columns: 1fr; }
+      }
+      .panel {
+        background: #1a1a2e;
+        border-radius: 12px;
+        padding: 1.5rem;
+        border: 1px solid #2a2a4a;
+      }
+      .panel h2 {
+        font-size: 1.2rem;
+        color: #7bed9f;
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+      label {
+        display: block;
+        font-size: 0.85rem;
+        color: #aaa;
+        margin-bottom: 0.4rem;
+      }
+      input[type="password"],
+      input[type="text"] {
+        width: 100%;
+        padding: 0.7rem 1rem;
+        border-radius: 8px;
+        border: 1px solid #333;
+        background: #16213e;
+        color: #eee;
+        font-size: 1rem;
+        outline: none;
+        transition: border-color 0.2s;
+      }
+      input:focus {
+        border-color: #7bed9f;
+      }
+      .result-box {
+        margin-top: 1rem;
+        padding: 0.8rem 1rem;
+        border-radius: 8px;
+        background: #16213e;
+        border: 1px solid #2a2a4a;
+        font-size: 0.9rem;
+        min-height: 2.4rem;
+      }
+      .result-box.server {
+        border-color: #e94560;
+      }
+      .result-label {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 0.3rem;
+        font-weight: 600;
+      }
+      .result-label.browser { color: #7bed9f; }
+      .result-label.server { color: #e94560; }
+
+      /* Strength bar */
+      .strength-bar-container {
+        margin-top: 0.8rem;
+        height: 8px;
+        background: #2a2a4a;
+        border-radius: 4px;
+        overflow: hidden;
+      }
+      .strength-bar {
+        height: 100%;
+        border-radius: 4px;
+        transition: width 0.3s, background 0.3s;
+      }
+      .strength-bar.weak { background: #e94560; }
+      .strength-bar.fair { background: #f9a825; }
+      .strength-bar.strong { background: #7bed9f; }
+      .strength-bar.very_strong { background: #00e676; }
+
+      /* Data flow diagram */
+      .data-flow {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        margin-top: 1.2rem;
+        padding: 0.8rem;
+        background: #12122a;
+        border-radius: 8px;
+      }
+      .flow-box {
+        padding: 0.5rem 0.8rem;
+        border-radius: 6px;
+        font-size: 0.75rem;
+        text-align: center;
+        min-width: 120px;
+      }
+      .flow-box.browser-box {
+        background: rgba(123, 237, 159, 0.12);
+        border: 1px solid #7bed9f;
+        color: #7bed9f;
+      }
+      .flow-box.server-box {
+        background: rgba(233, 69, 96, 0.12);
+        border: 1px solid #e94560;
+        color: #e94560;
+      }
+      .flow-arrow {
+        color: #555;
+        font-size: 1.2rem;
+        flex-shrink: 0;
+      }
+      .flow-detail {
+        font-size: 0.65rem;
+        margin-top: 0.2rem;
+        opacity: 0.8;
+      }
+
+      /* Server log */
+      .server-log {
+        margin-top: 2.5rem;
+        background: #1a1a2e;
+        border-radius: 12px;
+        padding: 1.5rem;
+        border: 1px solid #2a2a4a;
+      }
+      .server-log h2 {
+        font-size: 1.1rem;
+        color: #e94560;
+        margin-bottom: 1rem;
+      }
+      .log-entries {
+        max-height: 200px;
+        overflow-y: auto;
+        font-family: 'SF Mono', 'Fira Code', monospace;
+        font-size: 0.8rem;
+      }
+      .log-entry {
+        padding: 0.4rem 0.6rem;
+        border-bottom: 1px solid #1f1f3a;
+        color: #ccc;
+        display: flex;
+        gap: 0.6rem;
+      }
+      .log-entry .timestamp {
+        color: #666;
+        flex-shrink: 0;
+      }
+      .log-entry .event-name {
+        color: #e94560;
+        flex-shrink: 0;
+      }
+      .log-entry .event-data {
+        color: #7bed9f;
+        word-break: break-all;
+      }
+      .empty-log {
+        color: #555;
+        font-style: italic;
+        font-size: 0.85rem;
+      }
+      .status-badge {
+        display: inline-block;
+        padding: 0.2rem 0.6rem;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: 600;
+      }
+      .status-badge.loading {
+        background: rgba(249, 168, 37, 0.2);
+        color: #f9a825;
+      }
+      .status-badge.ready {
+        background: rgba(123, 237, 159, 0.2);
+        color: #7bed9f;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>&#128274; Confidential Computation</h1>
+        <p>
+          Sensitive data (passwords, SSNs) is processed entirely in client-side
+          WASM. The server only receives masked or computed results -- never the
+          raw secrets.
+        </p>
+      </div>
+      <%= @inner_content %>
+    </div>
+    <script defer phx-track-static src={"/assets/app.js"}></script>
+  </body>
+</html>

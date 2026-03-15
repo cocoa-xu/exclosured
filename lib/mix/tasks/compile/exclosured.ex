@@ -1,0 +1,96 @@
+defmodule Mix.Tasks.Compile.Exclosured do
+  @moduledoc """
+  Mix compiler that builds Rust crates into WebAssembly.
+
+  Add `:exclosured` to your project's compilers list:
+
+      def project do
+        [
+          compilers: [:exclosured] ++ Mix.compilers(),
+          ...
+        ]
+      end
+
+  ## Configuration
+
+      config :exclosured,
+        source_dir: "native/wasm",
+        output_dir: "priv/static/wasm",
+        optimize: :none,
+        modules: [
+          my_mod: [],
+          heavy_compute: [wasm_bindgen: true, features: ["simd"]]
+        ]
+  """
+
+  use Mix.Task.Compiler
+
+  @recursive true
+
+  @impl true
+  def run(_args) do
+    config = Exclosured.Config.read()
+    stale = Exclosured.Manifest.stale_modules(config)
+
+    if stale == [] do
+      Mix.shell().info("All WASM modules are up to date")
+      {:noop, []}
+    else
+      manifest = Exclosured.Manifest.read()
+
+      {diagnostics, manifest} =
+        Enum.reduce(stale, {[], manifest}, fn mod, {diags, manifest} ->
+          case Exclosured.Compiler.compile_module(mod, config) do
+            :ok ->
+              manifest = Exclosured.Manifest.update_module(manifest, mod, config)
+              {diags, manifest}
+
+            {:error, message} ->
+              diagnostic = %Mix.Task.Compiler.Diagnostic{
+                compiler_name: "exclosured",
+                file: Path.join([config.source_dir, Atom.to_string(mod.name), "src", "lib.rs"]),
+                message: message,
+                position: 0,
+                severity: :error
+              }
+
+              {[diagnostic | diags], manifest}
+          end
+        end)
+
+      Exclosured.Manifest.write(manifest)
+
+      case diagnostics do
+        [] -> {:ok, []}
+        diags -> {:error, diags}
+      end
+    end
+  end
+
+  @impl true
+  def manifests do
+    [Exclosured.Manifest.path()]
+  end
+
+  @impl true
+  def clean do
+    config = Exclosured.Config.read()
+
+    config
+    |> Exclosured.Config.compilable_modules()
+    |> Enum.each(fn mod ->
+      name = Atom.to_string(mod.name)
+
+      if mod.wasm_bindgen do
+        out_dir = Path.join(config.output_dir, name)
+        File.rm_rf!(out_dir)
+      else
+        wasm_path = Path.join(config.output_dir, "#{name}.wasm")
+        File.rm(wasm_path)
+      end
+    end)
+
+    Exclosured.Manifest.clean()
+    :ok
+  end
+end

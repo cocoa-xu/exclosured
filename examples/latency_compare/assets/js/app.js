@@ -1,0 +1,251 @@
+import { Socket } from "phoenix";
+import { LiveSocket } from "phoenix_live_view";
+
+// === ExclosuredHook =========================================================
+// Standard WASM loader for compute-mode modules. Loads the .wasm file,
+// instantiates it, and stores exports + memory on window globals.
+
+const ExclosuredHook = {
+  async mounted() {
+    try {
+      const resp = fetch("/wasm/image_filter.wasm");
+      const { instance } = await WebAssembly.instantiateStreaming(resp, {
+        env: {
+          __exclosured_emit: () => {},
+          __exclosured_broadcast: () => {},
+        },
+      });
+      window.__exclosured_wasm = instance.exports;
+      window.__exclosured_memory = instance.exports.memory;
+      this.pushEvent("wasm:ready", {});
+    } catch (err) {
+      console.error("Failed to load WASM module 'image_filter'", err);
+    }
+  },
+};
+
+// === CompareHook ============================================================
+// Attached to the canvas container. Handles test pattern generation,
+// WASM image loading, and the two filter modes (local WASM vs server roundtrip).
+
+const CompareHook = {
+  mounted() {
+    this.canvas = this.el.querySelector("canvas");
+    this.ctx = this.canvas.getContext("2d");
+    this.W = this.canvas.width;
+    this.H = this.canvas.height;
+    this.wasm = null;
+    this.pendingTimestamp = null;
+
+    // Register server event handler before any async work
+    this.handleEvent("server:filter_result", (payload) => {
+      this._onServerResult(payload);
+    });
+
+    this._loadWasmAndInit();
+    this._setupSliderListeners();
+  },
+
+  async _loadWasmAndInit() {
+    // Wait for WASM to be loaded (may already be done by ExclosuredHook
+    // or we load it ourselves if ExclosuredHook is not present)
+    await this._ensureWasm();
+
+    // Generate and render the test pattern
+    this._generateTestPattern();
+
+    // Load the test pattern pixels into WASM
+    this._pushPixelsToWasm();
+
+    // Initial render (identity filter)
+    this._applyWasmFilter(0, 0);
+  },
+
+  async _ensureWasm() {
+    // If already loaded, use it
+    if (window.__exclosured_wasm) {
+      this.wasm = window.__exclosured_wasm;
+      return;
+    }
+
+    // Otherwise load it ourselves
+    try {
+      const resp = fetch("/wasm/image_filter.wasm");
+      const { instance } = await WebAssembly.instantiateStreaming(resp, {
+        env: {
+          __exclosured_emit: () => {},
+          __exclosured_broadcast: () => {},
+        },
+      });
+      window.__exclosured_wasm = instance.exports;
+      window.__exclosured_memory = instance.exports.memory;
+      this.wasm = instance.exports;
+    } catch (err) {
+      console.error("Failed to load WASM module", err);
+    }
+  },
+
+  // Generate a visually appealing 256x256 test pattern:
+  // concentric rings with a rainbow gradient overlay and some geometric shapes.
+  _generateTestPattern() {
+    const w = this.W;
+    const h = this.H;
+    const imgData = this.ctx.createImageData(w, h);
+    const data = imgData.data;
+    const cx = w / 2;
+    const cy = h / 2;
+
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const idx = (y * w + x) * 4;
+
+        // Distance from center (normalized 0..1)
+        const dx = (x - cx) / cx;
+        const dy = (y - cy) / cy;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        // Angle for rainbow hue (0..1)
+        const angle = (Math.atan2(dy, dx) / Math.PI + 1.0) / 2.0;
+
+        // Concentric rings
+        const ring = Math.sin(dist * 12.0 * Math.PI) * 0.5 + 0.5;
+
+        // Rainbow color based on angle
+        const hue = angle * 360;
+        const rgb = hslToRgb(hue, 0.8, 0.45 + ring * 0.15);
+
+        // Diamond pattern overlay
+        const diamond = Math.abs(dx) + Math.abs(dy);
+        const diamondEdge = Math.abs(Math.sin(diamond * 8.0 * Math.PI));
+
+        // Blend: base rainbow with ring modulation + diamond highlight
+        const highlight = diamondEdge > 0.95 ? 0.3 : 0.0;
+
+        data[idx] = Math.min(255, rgb[0] + highlight * 255);
+        data[idx + 1] = Math.min(255, rgb[1] + highlight * 255);
+        data[idx + 2] = Math.min(255, rgb[2] + highlight * 255);
+        data[idx + 3] = 255;
+      }
+    }
+
+    this.ctx.putImageData(imgData, 0, 0);
+  },
+
+  _pushPixelsToWasm() {
+    if (!this.wasm) return;
+    const imgData = this.ctx.getImageData(0, 0, this.W, this.H);
+    const src = imgData.data;
+    const ptr = this.wasm.alloc(src.length);
+    new Uint8Array(this.wasm.memory.buffer, ptr, src.length).set(src);
+    this.wasm.load_image(ptr, src.length, this.W, this.H);
+    this.wasm.dealloc(ptr, src.length);
+  },
+
+  _applyWasmFilter(brightness, contrast) {
+    if (!this.wasm) return;
+    this.wasm.apply_filter(brightness, contrast);
+    const ptr = this.wasm.canvas_ptr();
+    const len = this.wasm.canvas_len();
+    const pixels = new Uint8ClampedArray(
+      this.wasm.memory.buffer,
+      ptr,
+      len
+    );
+    const imgData = new ImageData(pixels, this.W, this.H);
+    this.ctx.putImageData(imgData, 0, 0);
+  },
+
+  _setupSliderListeners() {
+    // Listen on the actual slider inputs for real-time "input" events.
+    // In WASM mode: apply filter directly (zero network).
+    // In server mode: record timestamp and let phx-change handle the server roundtrip.
+    const brightnessSlider = document.getElementById("brightness-slider");
+    const contrastSlider = document.getElementById("contrast-slider");
+
+    const onInput = () => {
+      const mode = this.el.dataset.mode;
+      const b = parseInt(brightnessSlider.value, 10);
+      const c = parseInt(contrastSlider.value, 10);
+
+      if (mode === "wasm") {
+        // Direct WASM call - no network, instant
+        const start = performance.now();
+        this._applyWasmFilter(b, c);
+        const elapsed = Math.round(performance.now() - start);
+        this.pushEvent("report_latency", { ms: elapsed });
+      } else {
+        // Server mode: record the send timestamp.
+        // The phx-change on the form will fire and send to server.
+        // Server will bounce it back via server:filter_result event.
+        this.pendingTimestamp = performance.now();
+      }
+    };
+
+    if (brightnessSlider) {
+      brightnessSlider.addEventListener("input", onInput);
+    }
+    if (contrastSlider) {
+      contrastSlider.addEventListener("input", onInput);
+    }
+  },
+
+  _onServerResult(payload) {
+    // Server has bounced the slider values back to us.
+    // Apply the filter via WASM and measure the round-trip time.
+    const b = payload.brightness;
+    const c = payload.contrast;
+    this._applyWasmFilter(b, c);
+
+    if (this.pendingTimestamp) {
+      const elapsed = Math.round(performance.now() - this.pendingTimestamp);
+      this.pendingTimestamp = null;
+      this.pushEvent("report_latency", { ms: elapsed });
+    }
+  },
+
+  destroyed() {
+    this.wasm = null;
+  },
+};
+
+// Convert HSL (h: 0-360, s: 0-1, l: 0-1) to RGB array [r, g, b] (0-255)
+function hslToRgb(h, s, l) {
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = l - c / 2;
+  let r, g, b;
+
+  if (h < 60) {
+    r = c; g = x; b = 0;
+  } else if (h < 120) {
+    r = x; g = c; b = 0;
+  } else if (h < 180) {
+    r = 0; g = c; b = x;
+  } else if (h < 240) {
+    r = 0; g = x; b = c;
+  } else if (h < 300) {
+    r = x; g = 0; b = c;
+  } else {
+    r = c; g = 0; b = x;
+  }
+
+  return [
+    Math.round((r + m) * 255),
+    Math.round((g + m) * 255),
+    Math.round((b + m) * 255),
+  ];
+}
+
+// -- LiveSocket setup --------------------------------------------------------
+
+let csrfToken = document
+  .querySelector("meta[name='csrf-token']")
+  ?.getAttribute("content");
+
+let liveSocket = new LiveSocket("/live", Socket, {
+  hooks: { Exclosured: ExclosuredHook, Compare: CompareHook },
+  params: { _csrf_token: csrfToken },
+});
+
+liveSocket.connect();
+window.liveSocket = liveSocket;

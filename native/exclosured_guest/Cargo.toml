@@ -1,0 +1,9 @@
+[package]
+name = "exclosured_guest"
+version = "0.1.0"
+edition = "2021"
+description = "Guest-side helpers for Exclosured WASM modules"
+license = "MIT"
+
+[lib]
+crate-type = ["rlib"]

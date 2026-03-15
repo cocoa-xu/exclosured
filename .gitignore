@@ -22,3 +22,9 @@ erl_crash.dump
 # Ignore package tarball (built via "mix hex.build").
 exclosured-*.tar
 
+# WASM build artifacts
+/priv/static/wasm/
+
+# Cargo build artifacts in consumer projects
+native/wasm/target/
+

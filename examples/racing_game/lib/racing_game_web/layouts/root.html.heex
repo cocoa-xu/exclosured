@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="csrf-token" content={Phoenix.Controller.get_csrf_token()} />
+    <title>Exclosured Racing</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body { font-family: 'Courier New', monospace; background: #0a0a1a; color: #eee; display: flex; justify-content: center; padding: 1rem; }
+      main { width: 100%; max-width: 500px; }
+
+      .game-header { text-align: center; margin-bottom: 0.75rem; }
+      .game-header h1 { font-size: 1.3rem; color: #ff6b6b; letter-spacing: 2px; }
+      .status-bar { display: flex; justify-content: center; gap: 0.75rem; margin-top: 0.25rem; font-size: 0.75rem; }
+      .phase-badge { background: #1a1a3e; padding: 0.15rem 0.5rem; border-radius: 4px; color: #feca57; text-transform: uppercase; letter-spacing: 1px; }
+      .spectator-badge { background: #5f27cd; padding: 0.15rem 0.5rem; border-radius: 4px; color: #fff; }
+      .wasm-status { color: #555; }
+
+      .lobby-panel { background: #12122a; border: 1px solid #222; border-radius: 8px; padding: 1rem; margin-bottom: 0.75rem; }
+      .lobby-panel h2 { font-size: 1rem; color: #feca57; margin-bottom: 0.5rem; }
+      .lobby-panel form { display: flex; gap: 0.5rem; margin-bottom: 0.75rem; }
+      .lobby-panel input[type="text"] { flex: 1; padding: 0.4rem 0.6rem; background: #1a1a3e; border: 1px solid #333; border-radius: 6px; color: #eee; font-family: inherit; font-size: 0.85rem; }
+      .lobby-panel button { padding: 0.4rem 1rem; background: #ff6b6b; border: none; border-radius: 6px; color: #fff; cursor: pointer; font-family: inherit; font-weight: bold; }
+      .lobby-panel button:hover { background: #ee5a5a; }
+      .player-list { list-style: none; }
+      .player-list li { padding: 0.2rem 0; color: #aaa; font-size: 0.85rem; }
+      .player-list li::before { content: "▸ "; color: #54a0ff; }
+      .waiting { color: #555; font-size: 0.8rem; margin-top: 0.5rem; }
+
+      .results-panel { background: #12122a; border: 1px solid #feca57; border-radius: 8px; padding: 1rem; margin-bottom: 0.75rem; }
+      .results-panel h2 { color: #feca57; font-size: 1rem; margin-bottom: 0.5rem; }
+      .results-panel ol { list-style: none; counter-reset: rank; }
+      .results-panel li { padding: 0.3rem 0; font-size: 0.85rem; color: #ccc; counter-increment: rank; }
+      .results-panel li::before { content: "#" counter(rank) " "; color: #feca57; font-weight: bold; }
+      .results-panel li:first-child { color: #feca57; font-size: 1rem; }
+
+      #race-container { border-radius: 8px; overflow: hidden; border: 1px solid #222; }
+      canvas { display: block; width: 100%; background: #1a1a2e; }
+
+      .controls-hint { text-align: center; color: #444; font-size: 0.7rem; margin-top: 0.5rem; }
+    </style>
+  </head>
+  <body>
+    <%= @inner_content %>
+    <script defer phx-track-static src={"/assets/app.js"}></script>
+  </body>
+</html>

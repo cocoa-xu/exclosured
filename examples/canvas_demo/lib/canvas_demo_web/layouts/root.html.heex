@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="csrf-token" content={Phoenix.Controller.get_csrf_token()} />
+    <title>Canvas Demo - Exclosured</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body { font-family: system-ui, sans-serif; max-width: 900px; margin: 0 auto; padding: 2rem; background: #0a0a1a; color: #eee; }
+      h1 { margin-bottom: 0.5rem; color: #00d2ff; }
+      p.desc { color: #aaa; margin-bottom: 1.5rem; }
+      .controls { display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap; align-items: center; }
+      .controls label { color: #aaa; font-size: 0.9rem; }
+      .controls input[type="range"] { width: 150px; }
+      .controls input[type="color"] { border: none; background: none; width: 40px; height: 30px; cursor: pointer; }
+      .sync-toggle { margin-bottom: 1rem; }
+      .sync-toggle label { color: #aaa; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; }
+      .sync-toggle input[type="checkbox"] { width: 16px; height: 16px; accent-color: #00d2ff; cursor: pointer; }
+      canvas { border: 1px solid #333; border-radius: 8px; display: block; }
+      .status { color: #666; font-size: 0.85rem; margin-top: 0.5rem; }
+    </style>
+  </head>
+  <body>
+    <%= @inner_content %>
+    <script defer phx-track-static src={"/assets/app.js"}></script>
+  </body>
+</html>

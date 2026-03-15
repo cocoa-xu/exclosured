@@ -1,0 +1,3 @@
+[workspace]
+members = ["race_client"]
+resolver = "2"

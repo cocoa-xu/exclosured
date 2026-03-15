@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="csrf-token" content={Phoenix.Controller.get_csrf_token()} />
+    <title>Confidential Collab Editor - Exclosured</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body { font-family: system-ui, -apple-system, sans-serif; background: #0f0f1a; color: #ccc; padding: 1.5rem; max-width: 860px; margin: 0 auto; }
+
+      .header h1 { color: #7bed9f; font-size: 1.5rem; margin-bottom: 0.25rem; }
+      .header .desc { color: #666; font-size: 0.85rem; margin-bottom: 1rem; line-height: 1.4; }
+      .header .desc strong { color: #7bed9f; }
+
+      /* Toolbar */
+      .toolbar { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; padding: 0.6rem 0.75rem; background: #1a1a2e; border: 1px solid #2a2a3e; border-bottom: none; border-radius: 10px 10px 0 0; }
+      .tool-group { display: flex; gap: 0.4rem; align-items: center; }
+      .tool-group + .tool-group { padding-left: 0.75rem; border-left: 1px solid #2a2a3e; }
+      .tool-group label { color: #777; font-size: 0.8rem; display: flex; align-items: center; gap: 0.3rem; }
+      .tool-group input[type="color"] { width: 28px; height: 24px; border: 1px solid #333; border-radius: 4px; background: none; cursor: pointer; padding: 0; }
+      .tool-group input[type="range"] { width: 80px; accent-color: #7bed9f; }
+      button.tool, button.filter-btn { padding: 0.3rem 0.6rem; border: 1px solid #333; border-radius: 6px; background: #16213e; color: #aaa; font-size: 0.78rem; cursor: pointer; transition: all 0.15s; }
+      button.tool:hover, button.filter-btn:hover { border-color: #7bed9f; color: #eee; }
+      button.tool.active { background: #7bed9f; color: #0f0f1a; border-color: #7bed9f; font-weight: 600; }
+      .filters { margin-left: auto; }
+      .filters .label { color: #555; font-size: 0.75rem; margin-right: 0.2rem; }
+
+      /* Editor / Canvas */
+      #editor { position: relative; border: 1px solid #2a2a3e; border-top: none; border-radius: 0 0 10px 10px; overflow: hidden; background: #1a1a2e; }
+      canvas { display: block; cursor: crosshair; background: #1a1a2e; }
+      .drop-zone { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(15, 15, 26, 0.92); z-index: 10; border: 2px dashed #333; border-radius: 0 0 10px 10px; transition: border-color 0.2s; }
+      .drop-zone.dragover { border-color: #7bed9f; }
+      .drop-zone p { color: #555; font-size: 0.95rem; margin-bottom: 0.75rem; }
+      .drop-zone input[type="file"] { font-size: 0.85rem; color: #888; }
+      .drop-zone input[type="file"]::file-selector-button { padding: 0.4rem 1rem; border: 1px solid #7bed9f; border-radius: 6px; background: transparent; color: #7bed9f; cursor: pointer; font-size: 0.85rem; margin-right: 0.5rem; }
+      .drop-zone input[type="file"]::file-selector-button:hover { background: #7bed9f22; }
+
+      /* Status bar */
+      .status-bar { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin-top: 0.6rem; font-size: 0.78rem; }
+      .connection-info { display: flex; align-items: center; gap: 0.4rem; color: #555; }
+      .indicator { width: 8px; height: 8px; border-radius: 50%; background: #555; }
+      .indicator.connected { background: #7bed9f; box-shadow: 0 0 6px #7bed9f88; }
+      .privacy-badge { color: #555; margin-left: auto; }
+      .privacy-badge .lock { font-size: 0.7rem; }
+      .wasm-badge { color: #444; }
+    </style>
+  </head>
+  <body>
+    <%= @inner_content %>
+    <script defer phx-track-static src={"/assets/app.js"}></script>
+  </body>
+</html>
