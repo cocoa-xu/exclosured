@@ -49,7 +49,7 @@ defmodule ConfidentialComputeWeb.PrivacyLive do
         <div :if={@pw_result} style="margin-top: 0.8rem;">
           <div class="result-label browser">Processed in Browser (WASM)</div>
           <div class="result-box">
-            Full password analyzed locally -- never leaves your browser.
+            Full password analyzed locally. Never leaves your browser.
           </div>
         </div>
 
@@ -90,7 +90,7 @@ defmodule ConfidentialComputeWeb.PrivacyLive do
         <div :if={@ssn_result} style="margin-top: 0.8rem;">
           <div class="result-label browser">Processed in Browser (WASM)</div>
           <div class="result-box">
-            Full SSN analyzed locally -- never leaves your browser.
+            Full SSN analyzed locally. Never leaves your browser.
           </div>
         </div>
 
@@ -120,7 +120,7 @@ defmodule ConfidentialComputeWeb.PrivacyLive do
     <div class="server-log">
       <h2>&#128466; What the Server Received</h2>
       <p style="color: #888; font-size: 0.8rem; margin-bottom: 0.8rem;">
-        Every event below shows ONLY the computed/masked data -- never raw passwords or SSNs.
+        Every event below shows ONLY the computed/masked data, never raw passwords or SSNs.
       </p>
       <div class="log-entries">
         <div :if={@server_log == []} class="empty-log">

@@ -1,4 +1,4 @@
-# Latency Compare -- Server Roundtrip vs Local WASM
+# Latency Compare: Server Roundtrip vs Local WASM
 
 **Port 4007** | `cd examples/latency_compare && mix deps.get && mix compile && mix phx.server`
 
@@ -16,7 +16,7 @@ This demo uses a **full Cargo workspace** because the WASM module needs persiste
 
 ### The problem
 
-Interactive features (drawing, scrubbing, dragging, real-time previews) need sub-16ms response times to feel smooth. A server round-trip -- even on localhost -- adds 5-50ms. On a real network, 50-200ms. This makes sliders jittery, drawing laggy, and previews choppy.
+Interactive features (drawing, scrubbing, dragging, real-time previews) need sub-16ms response times to feel smooth. A server round-trip, even on localhost, adds 5-50ms. On a real network, 50-200ms. This makes sliders jittery, drawing laggy, and previews choppy.
 
 ### Alternative approaches
 
@@ -29,18 +29,18 @@ Interactive features (drawing, scrubbing, dragging, real-time previews) need sub
 
 ### What Exclosured adds
 
-- `mix compile` builds the Rust crate to `.wasm` automatically -- incremental, only recompiles on change
-- `thread_local!` state in WASM persists the original image across slider changes -- no re-upload per frame
+- `mix compile` builds the Rust crate to `.wasm` automatically, incremental, only recompiles on change
+- `thread_local!` state in WASM persists the original image across slider changes, no re-upload per frame
 - In WASM mode: slider `input` event → JS calls `apply_filter(b, c)` → reads `canvas_ptr()` → `putImageData`. Zero network.
 - In server mode: slider `input` event → `phx-change` → server receives → `push_event` back → JS renders. The round-trip IS the demo.
-- Toggle between modes with one button -- same UI, same result, different latency
+- Toggle between modes with one button. Same UI, same result, different latency
 
 ## Pros and Cons
 
 **Pros:**
-- The difference is felt, not just measured -- users immediately prefer the WASM mode
+- The difference is felt, not just measured. Users immediately prefer the WASM mode
 - WASM processes a 256x256 image in ~1-2ms; the server round-trip adds 10-100ms+ on top
-- Persistent WASM state means the original pixels are always available -- no re-upload, no cumulative drift
+- Persistent WASM state means the original pixels are always available, no re-upload, no cumulative drift
 - Full Cargo workspace gives access to external crates if needed (image processing, color science)
 - The server mode is a useful fallback for environments where WASM is disabled
 
@@ -48,7 +48,7 @@ Interactive features (drawing, scrubbing, dragging, real-time previews) need sub
 - Two code paths to maintain (server fallback + WASM). In practice, you'd pick one.
 - Cargo workspace requires more setup than inline `defwasm` (Cargo.toml, directory structure)
 - Larger `.wasm` binary (25KB here, but can grow with dependencies)
-- WASM `thread_local!` state is per-page -- navigating away loses it (same as any client state)
+- WASM `thread_local!` state is per-page. Navigating away loses it (same as any client state)
 - The comparison is most dramatic on real networks; on localhost, server mode is only ~5ms slower
 
 ## When to Choose This Pattern
@@ -60,4 +60,4 @@ Interactive features (drawing, scrubbing, dragging, real-time previews) need sub
 
 ## Architecture Note
 
-The "server mode" in this demo is intentionally honest -- the server receives the slider values and bounces them back via `push_event`. It doesn't actually process pixels. The point is that the round-trip latency alone (5-100ms depending on network) is enough to make the interaction feel sluggish. Even if the server could process instantly, the network is the bottleneck.
+The "server mode" in this demo is intentionally honest. The server receives the slider values and bounces them back via `push_event`. It doesn't actually process pixels. The point is that the round-trip latency alone (5-100ms depending on network) is enough to make the interaction feel sluggish. Even if the server could process instantly, the network is the bottleneck.

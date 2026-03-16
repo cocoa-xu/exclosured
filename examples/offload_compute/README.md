@@ -1,18 +1,18 @@
-# Offload Compute -- Server vs WASM Side-by-Side
+# Offload Compute: Server vs WASM Side-by-Side
 
 **Port 4005** | `cd examples/offload_compute && mix deps.get && mix compile && mix phx.server`
 
 ## What This Demonstrates
 
-The same CSV parsing logic runs in two places: server-side (Elixir) and client-side (WASM). The user clicks two buttons and compares timing. The WASM path does zero server work -- the browser handles everything locally.
+The same CSV parsing logic runs in two places: server-side (Elixir) and client-side (WASM). The user clicks two buttons and compares timing. The WASM path does zero server work. The browser handles everything locally.
 
-This demo uses **inline `defwasm`** -- the Rust function is defined directly in an Elixir module, compiled to a standalone `.wasm` at build time. No Cargo workspace, no `.rs` files.
+This demo uses **inline `defwasm`**: the Rust function is defined directly in an Elixir module, compiled to a standalone `.wasm` at build time. No Cargo workspace, no `.rs` files.
 
 ## Why Use Exclosured Here?
 
 ### The problem
 
-Your Phoenix app does CPU work per request -- data parsing, validation, transformation, report generation. Each concurrent user adds server load. At scale, you need bigger servers or a job queue, both of which increase cost and latency.
+Your Phoenix app does CPU work per request: data parsing, validation, transformation, report generation. Each concurrent user adds server load. At scale, you need bigger servers or a job queue, both of which increase cost and latency.
 
 ### Alternative approaches
 
@@ -32,14 +32,14 @@ defmodule OffloadComputeWeb.CsvParser do
 
   defwasm :parse_csv, args: [data: :binary] do
     """
-    // 30 lines of Rust -- parses CSV, computes stats, returns JSON
+    // 30 lines of Rust that parses CSV, computes stats, returns JSON
     """
   end
 end
 ```
 
 - No `native/wasm/` directory, no `Cargo.toml`, no workspace
-- Compiled to a 16KB `.wasm` at build time with `opt-level = "z"` + LTO
+- Compiled to a 16KB (`.wasm at build time with `opt-level = "z"` + LTO
 - The type declaration `args: [data: :binary]` generates all FFI boilerplate (pointer handling, memory management)
 - `OffloadComputeWeb.CsvParser.wasm_url()` gives you the URL to load in the browser
 
@@ -47,15 +47,15 @@ end
 
 **Pros:**
 - Server CPU for this task drops to exactly zero
-- 16KB `.wasm` -- smaller than most JavaScript libraries
+- 16KB .wasm`), smaller than most JavaScript libraries
 - Inline definition means the parsing logic lives next to the LiveView that uses it
 - Elixir compile-time constants interpolate into the Rust code via `#{}`
-- Scales to unlimited users -- each browser does its own work
+- Scales to unlimited users. Each browser does its own work
 
 **Cons:**
 - Inline `defwasm` can't use external Rust crates (no `serde`, no `csv` crate)
 - Rust code inside an Elixir string has no IDE support (no rust-analyzer)
-- Client devices vary -- a low-end phone will be slower than your server
+- Client devices vary. A low-end phone will be slower than your server
 - Not suitable if the result needs server-side data (database lookups, API calls)
 - The result must fit back into the input buffer (mutable `:binary` pattern)
 

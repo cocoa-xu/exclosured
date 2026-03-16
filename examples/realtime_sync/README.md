@@ -40,12 +40,12 @@ You're building a collaborative tool (document editor, whiteboard, design tool) 
 - Scales to any number of users (server relays small commands, not pixel data)
 - WASM pixel processing is 10-50x faster than equivalent JavaScript
 - Single source of truth in WASM, no state sync bugs between canvas and a separate model
-- Late joiners get a snapshot + ops replay -- consistent state guaranteed
+- Late joiners get a snapshot + ops replay Consistent state guaranteed.
 - Server never needs to understand image formats or pixel math
 
 **Cons:**
 - The initial snapshot transfer can be large (~1.6MB for 800x500 RGBA, base64 encoded ~2.1MB)
-- Operations applied independently on each client can theoretically diverge (floating-point differences) -- mitigated by periodic snapshot baking
+- Operations applied independently on each client can theoretically diverge (floating-point differences), mitigated by periodic snapshot baking
 - No undo/redo out of the box (would need an operation log with inverse operations)
 - Complex drawing operations (bezier curves, flood fill) require manual Rust implementations
 

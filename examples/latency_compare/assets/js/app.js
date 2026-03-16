@@ -236,7 +236,7 @@ function hslToRgb(h, s, l) {
   ];
 }
 
-// -- LiveSocket setup --------------------------------------------------------
+// === LiveSocket setup ===------------------------------------------------------
 
 let csrfToken = document
   .querySelector("meta[name='csrf-token']")

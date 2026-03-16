@@ -1,10 +1,10 @@
-# Confidential Compute -- Sensitive Data Never Leaves the Browser
+# Confidential Compute: Sensitive Data Never Leaves the Browser
 
 **Port 4006** | `cd examples/confidential_compute && mix deps.get && mix compile && mix phx.server`
 
 ## What This Demonstrates
 
-A password strength checker and SSN validator that process sensitive data entirely in the browser's WASM sandbox. The server only receives computed results (strength score, masked SSN) -- never the raw password or SSN. A visual data-flow diagram on the page makes this explicit.
+A password strength checker and SSN validator that process sensitive data entirely in the browser's WASM sandbox. The server only receives computed results (strength score, masked SSN), never the raw password or SSN. A visual data-flow diagram on the page makes this explicit.
 
 This demo uses **inline `defwasm`** with `~S` sigils for Rust code containing escaped quotes.
 
@@ -12,7 +12,7 @@ This demo uses **inline `defwasm`** with `~S` sigils for Rust code containing es
 
 ### The problem
 
-Your application handles sensitive user data -- passwords, government IDs, health records, financial details. Processing them server-side means:
+Your application handles sensitive user data: passwords, government IDs, health records, financial details. Processing them server-side means:
 - The data traverses the network (interceptable, even with TLS)
 - Your server sees the raw data (liability, compliance burden)
 - A server breach exposes all processed data
@@ -34,7 +34,7 @@ The key insight: the Elixir module IS the documentation of the privacy boundary.
 ```elixir
 defwasm :check_password, args: [input: :binary] do
   ~S"""
-  // This code runs in the browser -- input never leaves
+  // This code runs in the browser. Input never leaves
   // Only the score/label is returned to the caller
   """
 end
@@ -52,17 +52,17 @@ A security reviewer reads one file and sees:
 ## Pros and Cons
 
 **Pros:**
-- **Structural guarantee** -- the server literally cannot see the raw data. It's not a policy promise, it's a code-level impossibility.
-- Reduces compliance scope -- data that never leaves the browser isn't "data in transit" or "data at rest" on your server
+- **Structural guarantee**: the server literally cannot see the raw data. It's not a policy promise, it's a code-level impossibility.
+- Reduces compliance scope: data that never leaves the browser isn't "data in transit" or "data at rest" on your server
 - WASM sandbox is harder to tamper with than plain JavaScript (no source maps, compiled binary)
-- Small binaries (16KB) -- negligible load time overhead
+- Small binaries (16KB), negligible load time overhead
 - The `~S` sigil preserves Rust escape sequences, so JSON building with `\"` works naturally
 
 **Cons:**
-- The server cannot verify the computation -- it trusts the client's result. For password strength, this is fine (the user is the one who cares). For regulatory validation, you may need server-side verification too.
-- If the user disables JavaScript/WASM, the feature doesn't work -- you need a fallback or a hard requirement.
-- WASM is harder to tamper with than JS, but not impossible -- a determined attacker can still modify the binary. This is client-side processing, not a hardware enclave.
-- Debugging WASM is harder than debugging Elixir -- stack traces are less readable.
+- The server cannot verify the computation; it trusts the client's result. For password strength, this is fine (the user is the one who cares). For regulatory validation, you may need server-side verification too.
+- If the user disables JavaScript/WASM, the feature doesn't work. You need a fallback or a hard requirement.
+- WASM is harder to tamper with than JS, but not impossible. A determined attacker can still modify the binary. This is client-side processing, not a hardware enclave.
+- Debugging WASM is harder than debugging Elixir. Stack traces are less readable.
 - The mutable buffer pattern (write result back into input) requires careful size management.
 
 ## When to Choose This Pattern

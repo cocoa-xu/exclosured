@@ -221,7 +221,7 @@ end
 
 ### Example 4: Collaborative Image Editor
 
-Multiple users edit an image together. WASM is the source of truth for all pixel operations -- filters, drawing, and state snapshots. The server relays operations but never needs to process image data.
+Multiple users edit an image together. WASM is the source of truth for all pixel operations (filters, drawing, and state snapshots). The server relays operations but never needs to process image data.
 
 **Run it:** `cd examples/realtime_sync && mix deps.get && mix compile && mix phx.server` (port 4003)
 
@@ -433,6 +433,47 @@ exclosured::broadcast("ai:result", &json_payload);
 // Memory management (used by JS to write data into WASM memory)
 // alloc(size) and dealloc(ptr, size) are exported automatically
 ```
+
+## How Exclosured Compares to Other Elixir Libraries
+
+Several Elixir libraries work with Rust or WASM. They solve different problems.
+
+**[Rustler](https://github.com/rusterlium/rustler)** compiles Rust into NIFs that run inside the BEAM VM. Used by hundreds of projects for performance-critical server-side code (JSON parsing, crypto, image processing). The Rust code runs on your server, inside the BEAM. A NIF crash takes down the VM.
+
+**[Wasmex](https://github.com/tessi/wasmex)** runs WASM modules inside the BEAM VM using Wasmtime. You load a `.wasm` file on the server and call its functions from Elixir. Useful for sandboxing untrusted code or plugin systems. Still server-side, still uses your CPU.
+
+**[Orb](https://github.com/RoyalIcing/Orb)** lets you write WASM modules in Elixir syntax (no Rust needed). The Elixir code compiles to WASM bytecode at build time. Targets server-side execution and has a more limited instruction set than full Rust.
+
+**Exclosured** compiles Rust to WASM and delivers it to the user's browser, with LiveView as the communication layer. None of the others do this.
+
+| | Rustler | Wasmex | Orb | Exclosured |
+|---|---|---|---|---|
+| Where code runs | Server (BEAM) | Server (BEAM) | Server (BEAM) | User's browser |
+| Compilation target | NIF (.so/.dll) | .wasm (server) | .wasm (server) | .wasm (browser) |
+| Performance benefit | Faster server code | Sandboxed server code | Elixir-authored WASM | Offloads work from server entirely |
+| Data privacy | Server sees everything | Server sees everything | Server sees everything | Server can be excluded from data path |
+| LiveView integration | None | None | None | Bidirectional `push_event`/`handle_event` |
+
+### What's unique to Exclosured
+
+- **The execution target is the browser, not the server.** Every other library runs code on the server. Exclosured runs code on the client. This changes the cost model (server CPU drops to zero for offloaded tasks), the privacy model (server never receives sensitive data), and the latency model (local computation, no round-trip).
+
+- **LiveView is the communication layer.** `exclosured::emit("event", payload)` in Rust arrives as a LiveView `handle_info` message. `Exclosured.LiveView.call(socket, :mod, "func", args)` triggers a WASM function in the browser. No manual WebSocket plumbing.
+
+- **`defwasm` inline compilation.** Write Rust inside an Elixir module, compile to a browser-loadable `.wasm` at `mix compile` time. No other Elixir library offers this.
+
+- **Server-authority + client-rendering split.** Patterns like the racing game demo (GenServer owns game state, WASM renders at 60fps, LiveView manages lobby/UI) require a separate frontend app with any other library.
+
+### When to use the others instead
+
+Exclosured does not replace Rustler or Wasmex:
+
+- Need faster server-side JSON parsing or crypto? Use **Rustler**. The data is already on the server.
+- Need to run user-submitted plugins safely on the server? Use **Wasmex**. Browser execution is irrelevant for server-side sandboxing.
+- Want WASM without learning Rust? Consider **Orb** for server-side execution.
+- Users have weak devices (IoT, old phones)? Keep computation on the server. Your server is always faster than the worst client.
+
+Exclosured occupies the intersection of Rust performance, browser-side execution, and LiveView integration. The trade-off is complexity (three languages in one feature) and the requirement that the computation can actually happen on the client.
 
 ## License
 

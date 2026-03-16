@@ -94,7 +94,7 @@ defmodule LatencyCompareWeb.CompareLive do
       </div>
       <div class="hint">
         <%= if @mode == "wasm" do %>
-          Filter runs directly in WASM -- no network involved
+          Filter runs directly in WASM, no network involved
         <% else %>
           Slider value travels: browser -> server -> browser -> WASM -> canvas
         <% end %>

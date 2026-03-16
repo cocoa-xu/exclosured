@@ -28,3 +28,4 @@ exclosured-*.tar
 # Cargo build artifacts in consumer projects
 native/wasm/target/
 
+.DS_Store

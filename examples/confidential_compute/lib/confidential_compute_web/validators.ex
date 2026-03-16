@@ -1,7 +1,7 @@
 defmodule ConfidentialComputeWeb.Validators do
   use Exclosured.Inline
 
-  @doc "Password strength scoring -- runs entirely in the browser."
+  @doc "Password strength scoring. Runs entirely in the browser."
   defwasm :check_password, args: [input: :binary] do
     ~S"""
     let s = match core::str::from_utf8(input) {
@@ -98,7 +98,7 @@ defmodule ConfidentialComputeWeb.Validators do
     """
   end
 
-  @doc "SSN validation + masking -- only the masked value leaves the browser."
+  @doc "SSN validation and masking. Only the masked value leaves the browser."
   defwasm :mask_ssn, args: [input: :binary] do
     ~S"""
     let s = match core::str::from_utf8(input) {
