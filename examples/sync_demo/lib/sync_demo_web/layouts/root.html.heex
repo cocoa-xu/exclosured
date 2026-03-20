@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="csrf-token" content={Phoenix.Controller.get_csrf_token()} />
+    <title>Declarative State Sync - Exclosured</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+
+      body {
+        font-family: system-ui, -apple-system, sans-serif;
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 2rem;
+        background: #0a0a1a;
+        color: #eee;
+      }
+
+      h1 {
+        color: #00d2ff;
+        margin-bottom: 0.25rem;
+        font-size: 1.8rem;
+      }
+
+      .subtitle {
+        color: #888;
+        margin-bottom: 1.5rem;
+        font-size: 0.95rem;
+      }
+
+      .controls-section {
+        background: #111128;
+        border: 1px solid #222;
+        border-radius: 10px;
+        padding: 1.25rem;
+        margin-bottom: 1rem;
+      }
+
+      .controls-row {
+        display: flex;
+        gap: 1.5rem;
+        flex-wrap: wrap;
+        align-items: center;
+        margin-bottom: 0.75rem;
+      }
+
+      .controls-row:last-child {
+        margin-bottom: 0;
+      }
+
+      .control-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.3rem;
+      }
+
+      .control-group label {
+        color: #999;
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+
+      .control-group .value {
+        color: #00d2ff;
+        font-size: 0.8rem;
+        font-weight: 600;
+      }
+
+      input[type="range"] {
+        width: 140px;
+        accent-color: #00d2ff;
+        cursor: pointer;
+      }
+
+      input[type="color"] {
+        border: 2px solid #333;
+        border-radius: 6px;
+        background: none;
+        width: 44px;
+        height: 32px;
+        cursor: pointer;
+        padding: 2px;
+      }
+
+      .wave-buttons {
+        display: flex;
+        gap: 0.5rem;
+      }
+
+      .wave-btn {
+        background: #1a1a3a;
+        border: 1px solid #333;
+        color: #aaa;
+        padding: 0.4rem 0.9rem;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 0.85rem;
+        transition: all 0.15s ease;
+      }
+
+      .wave-btn:hover {
+        border-color: #00d2ff;
+        color: #eee;
+      }
+
+      .wave-btn.active {
+        background: #00d2ff22;
+        border-color: #00d2ff;
+        color: #00d2ff;
+        font-weight: 600;
+      }
+
+      .canvas-container {
+        margin-bottom: 1.5rem;
+      }
+
+      canvas {
+        border: 1px solid #222;
+        border-radius: 10px;
+        display: block;
+        width: 100%;
+        max-width: 600px;
+      }
+
+      .status {
+        color: #555;
+        font-size: 0.85rem;
+        margin-top: 0.5rem;
+      }
+
+      .status.ready {
+        color: #4ade80;
+      }
+
+      .how-it-works {
+        background: #0d0d24;
+        border: 1px solid #1a1a3a;
+        border-radius: 10px;
+        padding: 1.5rem;
+        margin-top: 1.5rem;
+      }
+
+      .how-it-works h2 {
+        color: #00d2ff;
+        font-size: 1.1rem;
+        margin-bottom: 0.75rem;
+      }
+
+      .how-it-works h3 {
+        color: #ccc;
+        font-size: 0.95rem;
+        margin-top: 1rem;
+        margin-bottom: 0.4rem;
+      }
+
+      .how-it-works p {
+        color: #999;
+        font-size: 0.9rem;
+        line-height: 1.5;
+        margin-bottom: 0.5rem;
+      }
+
+      .how-it-works code {
+        background: #1a1a3a;
+        color: #00d2ff;
+        padding: 0.15rem 0.4rem;
+        border-radius: 4px;
+        font-size: 0.85rem;
+      }
+
+      .how-it-works pre {
+        background: #0a0a18;
+        border: 1px solid #1a1a3a;
+        border-radius: 8px;
+        padding: 1rem;
+        overflow-x: auto;
+        margin: 0.75rem 0;
+        font-size: 0.82rem;
+        line-height: 1.5;
+        color: #ccc;
+      }
+
+      .comparison {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+        margin-top: 0.75rem;
+      }
+
+      .comparison-card {
+        background: #0a0a18;
+        border: 1px solid #1a1a3a;
+        border-radius: 8px;
+        padding: 1rem;
+      }
+
+      .comparison-card h4 {
+        font-size: 0.85rem;
+        margin-bottom: 0.5rem;
+      }
+
+      .comparison-card.before h4 { color: #f87171; }
+      .comparison-card.after h4 { color: #4ade80; }
+
+      .comparison-card pre {
+        margin: 0;
+        border: none;
+        padding: 0;
+        font-size: 0.78rem;
+      }
+    </style>
+  </head>
+  <body>
+    <%= @inner_content %>
+    <script defer phx-track-static src={"/assets/app.js"}></script>
+  </body>
+</html>

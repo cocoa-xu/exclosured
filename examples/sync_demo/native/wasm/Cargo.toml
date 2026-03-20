@@ -1,0 +1,3 @@
+[workspace]
+members = ["visualizer"]
+resolver = "2"

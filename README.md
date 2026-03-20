@@ -113,7 +113,7 @@ let liveSocket = new LiveSocket("/live", Socket, {
 
 ## Examples
 
-The `examples/` directory contains seven complete Phoenix applications, each demonstrating a different capability. See each demo's README for motivation, trade-offs, and when to use the pattern.
+The `examples/` directory contains complete Phoenix applications, each demonstrating a different capability. See each demo's README for motivation, trade-offs, and when to use the pattern.
 
 ### Example 1: Inline WASM (Zero Setup)
 
@@ -172,31 +172,54 @@ end
 
 A Rust WASM module drives a 60fps Canvas animation using wasm-bindgen + web-sys. LiveView pushes parameter updates without interrupting the render loop. Multiple users can sync via PubSub.
 
-### Example 4: Collaborative Image Editor
+### Example 4: Declarative State Sync
+
+**Run it:** `cd examples/sync_demo && mix deps.get && mix compile && mix phx.server` (port 4008)
+
+LiveView assigns automatically flow to WASM via the `sync` attribute. No manual `push_event` calls. Drag sliders to control a wave visualizer rendered at 60fps in WASM:
+
+```heex
+<Exclosured.LiveView.sandbox
+  module={:visualizer}
+  sync={%{frequency: @frequency, amplitude: @amplitude, speed: @speed, color: @color}}
+  canvas
+/>
+```
+
+```elixir
+# The entire event handler. No push_event anywhere.
+def handle_event("update_params", params, socket) do
+  {:noreply, assign(socket, frequency: params["frequency"], speed: params["speed"])}
+end
+```
+
+When `@frequency` or `@speed` changes, the component re-renders, the `data-wasm-sync` attribute updates with the new JSON, and the hook's `updated()` callback pushes it to WASM's `apply_state()`. Zero boilerplate.
+
+### Example 5: Collaborative Image Editor
 
 **Run it:** `cd examples/realtime_sync && mix deps.get && mix compile && mix phx.server` (port 4003)
 
 Multiple users edit an image together. WASM is the source of truth for all pixel operations. The server relays small operation commands but never processes image data.
 
-### Example 5: Multiplayer Racing Game
+### Example 6: Multiplayer Racing Game
 
 **Run it:** `cd examples/racing_game && mix deps.get && mix compile && mix phx.server` (port 4004)
 
 Server-authoritative multiplayer game. GenServer owns game state (anti-cheat, NPC spawning, timing), WASM renders at 60fps with local physics, LiveView manages lobby and leaderboard.
 
-### Example 6: Offload Computation (Server vs WASM)
+### Example 7: Offload Computation (Server vs WASM)
 
 **Run it:** `cd examples/offload_compute && mix deps.get && mix compile && mix phx.server` (port 4005)
 
 Same CSV parsing logic runs server-side (Elixir) and client-side (WASM). Side-by-side timing comparison. Uses inline `defwasm`.
 
-### Example 7: Confidential Computation
+### Example 8: Confidential Computation
 
 **Run it:** `cd examples/confidential_compute && mix deps.get && mix compile && mix phx.server` (port 4006)
 
 Password strength checker and SSN validator that process sensitive data entirely in the browser's WASM sandbox. The server only receives computed results, never the raw input.
 
-### Example 8: Latency Comparison
+### Example 9: Latency Comparison
 
 **Run it:** `cd examples/latency_compare && mix deps.get && mix compile && mix phx.server` (port 4007)
 
