@@ -19,7 +19,7 @@ defmodule Mix.Tasks.Compile.Exclosured do
         optimize: :none,
         modules: [
           my_mod: [],
-          heavy_compute: [wasm_bindgen: true, features: ["simd"]]
+          heavy_compute: [features: ["simd"]]
         ]
   """
 
@@ -80,14 +80,7 @@ defmodule Mix.Tasks.Compile.Exclosured do
     |> Exclosured.Config.compilable_modules()
     |> Enum.each(fn mod ->
       name = Atom.to_string(mod.name)
-
-      if mod.wasm_bindgen do
-        out_dir = Path.join(config.output_dir, name)
-        File.rm_rf!(out_dir)
-      else
-        wasm_path = Path.join(config.output_dir, "#{name}.wasm")
-        File.rm(wasm_path)
-      end
+      File.rm_rf!(Path.join(config.output_dir, name))
     end)
 
     Exclosured.Manifest.clean()

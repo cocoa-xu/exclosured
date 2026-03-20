@@ -6,7 +6,6 @@ defmodule Exclosured.ConfigTest do
       Application.delete_env(:exclosured, :source_dir)
       Application.delete_env(:exclosured, :output_dir)
       Application.delete_env(:exclosured, :optimize)
-      Application.delete_env(:exclosured, :wasm_bindgen)
       Application.delete_env(:exclosured, :modules)
     end)
   end
@@ -17,7 +16,6 @@ defmodule Exclosured.ConfigTest do
       assert config.source_dir == "native/wasm"
       assert config.output_dir == "priv/static/wasm"
       assert config.optimize == :none
-      assert config.wasm_bindgen == false
       assert config.modules == []
     end
 
@@ -35,7 +33,7 @@ defmodule Exclosured.ConfigTest do
     test "parses modules with defaults" do
       Application.put_env(:exclosured, :modules,
         my_mod: [],
-        heavy: [wasm_bindgen: true, features: ["simd"]]
+        heavy: [features: ["simd"]]
       )
 
       config = Exclosured.Config.read()
@@ -43,36 +41,18 @@ defmodule Exclosured.ConfigTest do
 
       my_mod = Exclosured.Config.module_config(config, :my_mod)
       assert my_mod.name == :my_mod
-      assert my_mod.mode == :compute
-      assert my_mod.wasm_bindgen == false
+      assert my_mod.canvas == false
       assert my_mod.features == []
 
       heavy = Exclosured.Config.module_config(config, :heavy)
       assert heavy.name == :heavy
-      assert heavy.wasm_bindgen == true
       assert heavy.features == ["simd"]
-    end
-
-    test "interactive mode forces wasm_bindgen" do
-      Application.put_env(:exclosured, :modules, game: [mode: :interactive])
-
-      config = Exclosured.Config.read()
-      game = Exclosured.Config.module_config(config, :game)
-      assert game.wasm_bindgen == true
     end
 
     test "raises on invalid optimize value" do
       Application.put_env(:exclosured, :optimize, :invalid)
 
       assert_raise Mix.Error, ~r/Invalid :optimize/, fn ->
-        Exclosured.Config.read()
-      end
-    end
-
-    test "raises on invalid mode" do
-      Application.put_env(:exclosured, :modules, bad: [mode: :invalid])
-
-      assert_raise Mix.Error, ~r/Invalid module :mode/, fn ->
         Exclosured.Config.read()
       end
     end
@@ -83,7 +63,7 @@ defmodule Exclosured.ConfigTest do
       Application.put_env(:exclosured, :modules,
         shared: [lib: true],
         engine: [],
-        renderer: [mode: :interactive]
+        renderer: [canvas: true]
       )
 
       config = Exclosured.Config.read()

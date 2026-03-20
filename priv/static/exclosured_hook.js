@@ -11,7 +11,6 @@ window.__exclosured_bus = window.__exclosured_bus || new EventTarget();
 const ExclosuredHook = {
   async mounted() {
     const name = this.el.dataset.wasmModule;
-    const mode = this.el.dataset.wasmMode || "compute";
 
     if (!name) {
       console.error("Exclosured: data-wasm-module attribute is required");
@@ -19,15 +18,74 @@ const ExclosuredHook = {
     }
 
     this._name = name;
-    this._mode = mode;
     this._subscriptions = [];
 
     try {
-      if (mode === "interactive") {
-        await this._mountInteractive(name);
-      } else {
-        await this._mountCompute(name);
+      // Set up the global namespace that wasm-bindgen imported functions
+      // will call into (emit_event, broadcast_event).
+      window.__exclosured = {
+        emit_event: (event, payload) => {
+          this.pushEvent("wasm:emit", {
+            module: name,
+            event: event,
+            payload: JSON.parse(payload),
+          });
+        },
+
+        broadcast_event: (channel, data) => {
+          window.__exclosured_bus.dispatchEvent(
+            new CustomEvent(channel, { detail: data })
+          );
+        },
+      };
+
+      // Import the wasm-bindgen JS glue and initialize the WASM module
+      const jsUrl = `/wasm/${name}/${name}.js`;
+      const wasmUrl = `/wasm/${name}/${name}_bg.wasm`;
+      const mod = await import(jsUrl);
+      await mod.default(wasmUrl);
+      this.wasmBindgen = mod;
+
+      // Initialize with canvas if the module exports an init function
+      if (mod.init) {
+        const canvas = this.el.querySelector("canvas") || this._createCanvas();
+        mod.init(canvas);
       }
+
+      // State sync: LiveView -> WASM
+      this.handleEvent("wasm:state", (state) => {
+        if (this.wasmBindgen && this.wasmBindgen.apply_state) {
+          if (state.binary) {
+            this.wasmBindgen.apply_state(new Uint8Array(state.binary));
+          } else {
+            const encoder = new TextEncoder();
+            const encoded = encoder.encode(JSON.stringify(state));
+            this.wasmBindgen.apply_state(encoded);
+          }
+        }
+      });
+
+      // Handle RPC calls from LiveView
+      this.handleEvent("wasm:call", ({ func, args, ref }) => {
+        try {
+          const fn = this.wasmBindgen[func];
+          if (!fn) throw new Error(`Function '${func}' not exported`);
+          const result = fn(...args);
+          this.pushEvent("wasm:result", {
+            ref: ref,
+            module: name,
+            func: func,
+            result: result,
+          });
+        } catch (e) {
+          this.pushEvent("wasm:error", {
+            ref: ref,
+            module: name,
+            func: func,
+            error: e.message,
+          });
+        }
+      });
 
       // Set up inter-module subscriptions
       this._setupSubscriptions();
@@ -44,111 +102,6 @@ const ExclosuredHook = {
     }
   },
 
-  async _mountCompute(name) {
-    const url = `/wasm/${name}.wasm`;
-    const response = fetch(url);
-
-    const { instance } = await WebAssembly.instantiateStreaming(response, {
-      env: {
-        __exclosured_emit: (eventPtr, eventLen, payloadPtr, payloadLen) => {
-          const event = this._readString(eventPtr, eventLen);
-          const payload = this._readString(payloadPtr, payloadLen);
-          this.pushEvent("wasm:emit", {
-            module: name,
-            event: event,
-            payload: JSON.parse(payload),
-          });
-        },
-
-        __exclosured_broadcast: (
-          channelPtr,
-          channelLen,
-          dataPtr,
-          dataLen
-        ) => {
-          const channel = this._readString(channelPtr, channelLen);
-          const data = this._readString(dataPtr, dataLen);
-          window.__exclosured_bus.dispatchEvent(
-            new CustomEvent(channel, { detail: data })
-          );
-        },
-      },
-    });
-
-    this.wasm = instance;
-    this.memory = instance.exports.memory;
-
-    // Listen for call requests from LiveView
-    this.handleEvent("wasm:call", ({ func, args, ref }) => {
-      try {
-        const result = this._callWasm(func, args);
-        this.pushEvent("wasm:result", {
-          ref: ref,
-          module: name,
-          func: func,
-          result: result,
-        });
-      } catch (e) {
-        this.pushEvent("wasm:error", {
-          ref: ref,
-          module: name,
-          func: func,
-          error: e.message,
-        });
-      }
-    });
-  },
-
-  async _mountInteractive(name) {
-    const canvas = this.el.querySelector("canvas") || this._createCanvas();
-
-    // wasm-bindgen modules have a JS glue file
-    const wasm = await import(`/wasm/${name}/${name}.js`);
-    await wasm.default(`/wasm/${name}/${name}_bg.wasm`);
-
-    this.wasmBindgen = wasm;
-
-    // Initialize with canvas if the module exports an init function
-    if (wasm.init) {
-      wasm.init(canvas);
-    }
-
-    // State sync: LiveView -> WASM (low frequency)
-    this.handleEvent("wasm:state", (state) => {
-      if (wasm.apply_state) {
-        if (state.binary) {
-          wasm.apply_state(new Uint8Array(state.binary));
-        } else {
-          const encoder = new TextEncoder();
-          const encoded = encoder.encode(JSON.stringify(state));
-          wasm.apply_state(encoded);
-        }
-      }
-    });
-
-    // Also support RPC calls for interactive modules
-    this.handleEvent("wasm:call", ({ func, args, ref }) => {
-      try {
-        const fn = wasm[func];
-        if (!fn) throw new Error(`Function '${func}' not exported`);
-        const result = fn(...args);
-        this.pushEvent("wasm:result", {
-          ref: ref,
-          module: name,
-          func: func,
-          result: result,
-        });
-      } catch (e) {
-        this.pushEvent("wasm:error", {
-          ref: ref,
-          module: name,
-          func: func,
-          error: e.message,
-        });
-      }
-    });
-  },
-
   _setupSubscriptions() {
     const subscribeAttr = this.el.dataset.wasmSubscribe;
     if (!subscribeAttr) return;
@@ -156,47 +109,13 @@ const ExclosuredHook = {
     const channels = subscribeAttr.split(",").map((s) => s.trim());
     channels.forEach((channel) => {
       const handler = (e) => {
-        if (this._mode === "compute") {
-          this._callWasm("on_broadcast", [channel, e.detail]);
-        } else if (this.wasmBindgen && this.wasmBindgen.on_broadcast) {
+        if (this.wasmBindgen && this.wasmBindgen.on_broadcast) {
           this.wasmBindgen.on_broadcast(channel, e.detail);
         }
       };
       window.__exclosured_bus.addEventListener(channel, handler);
       this._subscriptions.push({ channel, handler });
     });
-  },
-
-  _callWasm(func, args) {
-    const fn = this.wasm.exports[func];
-    if (!fn) throw new Error(`Function '${func}' not exported`);
-
-    // For string arguments, allocate in WASM memory
-    const wasmArgs = args.map((arg) => {
-      if (typeof arg === "string") {
-        const { ptr, len } = this._writeString(arg);
-        return [ptr, len];
-      }
-      return [arg];
-    });
-
-    // Flatten the args (ptr/len pairs become two args each)
-    const flatArgs = wasmArgs.flat();
-    return fn(...flatArgs);
-  },
-
-  _readString(ptr, len) {
-    return new TextDecoder().decode(
-      new Uint8Array(this.memory.buffer, ptr, len)
-    );
-  },
-
-  _writeString(str) {
-    const encoder = new TextEncoder();
-    const bytes = encoder.encode(str);
-    const ptr = this.wasm.exports.alloc(bytes.length);
-    new Uint8Array(this.memory.buffer, ptr, bytes.length).set(bytes);
-    return { ptr, len: bytes.length };
   },
 
   _createCanvas() {
@@ -214,9 +133,7 @@ const ExclosuredHook = {
     });
     this._subscriptions = [];
 
-    this.wasm = null;
     this.wasmBindgen = null;
-    this.memory = null;
   },
 };
 

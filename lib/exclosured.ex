@@ -10,8 +10,8 @@ defmodule Exclosured do
         output_dir: "priv/static/wasm",
         optimize: :none,
         modules: [
-          my_mod: [mode: :compute],
-          renderer: [mode: :interactive, canvas: true]
+          my_mod: [],
+          renderer: [canvas: true]
         ]
   """
 
@@ -20,34 +20,20 @@ defmodule Exclosured do
   """
   def wasm_path(module_name) when is_atom(module_name) do
     config = Exclosured.Config.read()
-    mod = Exclosured.Config.module_config(config, module_name)
-
-    if mod && mod.wasm_bindgen do
-      name = Atom.to_string(module_name)
-      Path.join([config.output_dir, name, "#{name}_bg.wasm"])
-    else
-      Path.join(config.output_dir, "#{module_name}.wasm")
-    end
+    name = Atom.to_string(module_name)
+    Path.join([config.output_dir, name, "#{name}_bg.wasm"])
   end
 
   @doc """
   Returns the browser-accessible URL path for a module's .wasm file.
   """
   def wasm_url(module_name) when is_atom(module_name) do
-    config = Exclosured.Config.read()
-    mod = Exclosured.Config.module_config(config, module_name)
-
-    if mod && mod.wasm_bindgen do
-      name = Atom.to_string(module_name)
-      "/wasm/#{name}/#{name}_bg.wasm"
-    else
-      "/wasm/#{module_name}.wasm"
-    end
+    name = Atom.to_string(module_name)
+    "/wasm/#{name}/#{name}_bg.wasm"
   end
 
   @doc """
   Returns the URL for a module's wasm-bindgen JS glue file.
-  Only applicable for modules with wasm_bindgen enabled.
   """
   def wasm_js_url(module_name) when is_atom(module_name) do
     name = Atom.to_string(module_name)

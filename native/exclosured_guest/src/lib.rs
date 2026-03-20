@@ -3,20 +3,14 @@
 //! Provides `emit()` for sending events to LiveView, `broadcast()` for
 //! inter-module communication, and memory management exports (`alloc`/`dealloc`).
 
-extern "C" {
-    fn __exclosured_emit(
-        event_ptr: *const u8,
-        event_len: usize,
-        payload_ptr: *const u8,
-        payload_len: usize,
-    );
+use wasm_bindgen::prelude::*;
 
-    fn __exclosured_broadcast(
-        channel_ptr: *const u8,
-        channel_len: usize,
-        data_ptr: *const u8,
-        data_len: usize,
-    );
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(js_namespace = __exclosured)]
+    fn emit_event(event: &str, payload: &str);
+    #[wasm_bindgen(js_namespace = __exclosured)]
+    fn broadcast_event(channel: &str, data: &str);
 }
 
 /// Emit an event to the LiveView server.
@@ -31,14 +25,7 @@ extern "C" {
 /// exclosured_guest::emit("progress", r#"{"percent": 50}"#);
 /// ```
 pub fn emit(event: &str, payload: &str) {
-    unsafe {
-        __exclosured_emit(
-            event.as_ptr(),
-            event.len(),
-            payload.as_ptr(),
-            payload.len(),
-        );
-    }
+    emit_event(event, payload);
 }
 
 /// Broadcast a message to other WASM modules on the same page.
@@ -53,14 +40,7 @@ pub fn emit(event: &str, payload: &str) {
 /// exclosured_guest::broadcast("ai:result", r#"{"label": "cat"}"#);
 /// ```
 pub fn broadcast(channel: &str, data: &str) {
-    unsafe {
-        __exclosured_broadcast(
-            channel.as_ptr(),
-            channel.len(),
-            data.as_ptr(),
-            data.len(),
-        );
-    }
+    broadcast_event(channel, data);
 }
 
 /// Allocate memory in the WASM linear memory.

@@ -26,7 +26,8 @@ defmodule Exclosured.InlineTest do
 
   describe "defwasm macro" do
     test "generates wasm_url/0" do
-      assert TestFilters.wasm_url() == "/wasm/exclosured_inline_test_test_filters.wasm"
+      assert TestFilters.wasm_url() ==
+               "/wasm/exclosured_inline_test_test_filters/exclosured_inline_test_test_filters_bg.wasm"
     end
 
     test "generates wasm_module_name/0" do

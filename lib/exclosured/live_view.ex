@@ -50,7 +50,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     end
 
     @doc """
-    Push a state update to an interactive WASM module.
+    Push a state update to a WASM module.
     """
     def push_state(socket, _module, state) when is_map(state) do
       push_event(socket, "wasm:state", state)
@@ -67,7 +67,6 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
       * `module` (required) - The WASM module name (atom)
       * `id` - Element ID (defaults to "wasm-{module}")
-      * `mode` - Execution mode: "compute" or "interactive" (default: "compute")
       * `canvas` - Whether to include a canvas element (default: false)
       * `width` - Canvas width (default: 800)
       * `height` - Canvas height (default: 600)
@@ -76,7 +75,6 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     """
     attr(:module, :atom, required: true)
     attr(:id, :string, default: nil)
-    attr(:mode, :string, default: "compute")
     attr(:canvas, :boolean, default: false)
     attr(:width, :integer, default: 800)
     attr(:height, :integer, default: 600)
@@ -99,7 +97,6 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         id={@id || @element_id}
         phx-hook="Exclosured"
         data-wasm-module={@module}
-        data-wasm-mode={@mode}
         data-wasm-subscribe={@subscribe_str}
         data-wasm-width={if @canvas, do: @width}
         data-wasm-height={if @canvas, do: @height}
@@ -122,44 +119,46 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       _ -> socket
     end
 
-    defp handle_wasm_event(
-           "wasm:result",
-           %{"ref" => _ref, "module" => module, "func" => func, "result" => result},
-           socket
-         ) do
-      mod_atom = String.to_existing_atom(module)
-      send(self(), {:wasm_result, mod_atom, func, result})
+    defp handle_wasm_event("wasm:result", %{"module" => module, "func" => func, "result" => result}, socket) do
+      with {:ok, mod_atom} <- safe_atom(module) do
+        send(self(), {:wasm_result, mod_atom, func, result})
+      end
+
       {:halt, socket}
     end
 
-    defp handle_wasm_event(
-           "wasm:emit",
-           %{"module" => module, "event" => event, "payload" => payload},
-           socket
-         ) do
-      mod_atom = String.to_existing_atom(module)
-      send(self(), {:wasm_emit, mod_atom, event, payload})
+    defp handle_wasm_event("wasm:emit", %{"module" => module, "event" => event, "payload" => payload}, socket) do
+      with {:ok, mod_atom} <- safe_atom(module) do
+        send(self(), {:wasm_emit, mod_atom, event, payload})
+      end
+
       {:halt, socket}
     end
 
-    defp handle_wasm_event(
-           "wasm:error",
-           %{"module" => module, "func" => func, "error" => error},
-           socket
-         ) do
-      mod_atom = String.to_existing_atom(module)
-      send(self(), {:wasm_error, mod_atom, func, error})
+    defp handle_wasm_event("wasm:error", %{"module" => module, "func" => func, "error" => error}, socket) do
+      with {:ok, mod_atom} <- safe_atom(module) do
+        send(self(), {:wasm_error, mod_atom, func, error})
+      end
+
       {:halt, socket}
     end
 
     defp handle_wasm_event("wasm:ready", %{"module" => module}, socket) do
-      mod_atom = String.to_existing_atom(module)
-      send(self(), {:wasm_ready, mod_atom})
+      with {:ok, mod_atom} <- safe_atom(module) do
+        send(self(), {:wasm_ready, mod_atom})
+      end
+
       {:halt, socket}
     end
 
     defp handle_wasm_event(_event, _params, socket) do
       {:cont, socket}
+    end
+
+    defp safe_atom(name) when is_binary(name) do
+      {:ok, String.to_existing_atom(name)}
+    rescue
+      ArgumentError -> :error
     end
   end
 end

@@ -12,19 +12,19 @@ defmodule Exclosured.Compiler do
   def compile_module(module_config, config) do
     with :ok <- check_prerequisites(),
          :ok <- cargo_build(module_config, config),
-         :ok <- maybe_wasm_bindgen(module_config, config),
-         :ok <- maybe_wasm_opt(module_config, config),
-         :ok <- copy_artifacts(module_config, config) do
+         :ok <- run_wasm_bindgen(module_config, config),
+         :ok <- maybe_wasm_opt(module_config, config) do
       :ok
     end
   end
 
   @doc """
-  Checks that required tools (cargo, wasm32 target) are available.
+  Checks that required tools (cargo, wasm32 target, wasm-bindgen) are available.
   """
   def check_prerequisites do
     with :ok <- check_cargo(),
-         :ok <- check_wasm32_target() do
+         :ok <- check_wasm32_target(),
+         :ok <- check_wasm_bindgen() do
       :ok
     end
   end
@@ -65,7 +65,25 @@ defmodule Exclosured.Compiler do
         end
 
       {_, _} ->
-        # rustup might not be available, try cargo build anyway
+        # rustup might not be available; try cargo build anyway
+        :ok
+    end
+  end
+
+  defp check_wasm_bindgen do
+    case System.find_executable("wasm-bindgen") do
+      nil ->
+        Mix.raise("""
+        `wasm-bindgen` not found in PATH.
+
+        Install it with:
+
+            cargo install wasm-bindgen-cli
+
+        Then try again.
+        """)
+
+      _path ->
         :ok
     end
   end
@@ -104,45 +122,27 @@ defmodule Exclosured.Compiler do
     end
   end
 
-  defp maybe_wasm_bindgen(%{wasm_bindgen: false}, _config), do: :ok
+  defp run_wasm_bindgen(module_config, config) do
+    name = Atom.to_string(module_config.name)
+    wasm_file = cargo_wasm_path(name, config)
+    out_dir = Path.join(config.output_dir, name)
+    File.mkdir_p!(out_dir)
 
-  defp maybe_wasm_bindgen(module_config, config) do
-    case System.find_executable("wasm-bindgen") do
-      nil ->
-        Mix.raise("""
-        `wasm-bindgen` is required for module #{module_config.name} but was not found.
+    args = [
+      "--target",
+      "web",
+      "--out-dir",
+      out_dir,
+      "--out-name",
+      name,
+      wasm_file
+    ]
 
-        Install it with:
-
-            cargo install wasm-bindgen-cli
-
-        Then try again.
-        """)
-
-      _path ->
-        name = Atom.to_string(module_config.name)
-        wasm_file = cargo_wasm_path(name, config)
-        out_dir = Path.join(config.output_dir, name)
-        File.mkdir_p!(out_dir)
-
-        args = [
-          "--target",
-          "web",
-          "--out-dir",
-          out_dir,
-          "--out-name",
-          name,
-          wasm_file
-        ]
-
-        case System.cmd("wasm-bindgen", args, stderr_to_stdout: true) do
-          {_, 0} -> :ok
-          {output, _} -> {:error, "wasm-bindgen failed for #{name}: #{output}"}
-        end
+    case System.cmd("wasm-bindgen", args, stderr_to_stdout: true) do
+      {_, 0} -> :ok
+      {output, _} -> {:error, "wasm-bindgen failed for #{name}: #{output}"}
     end
   end
-
-  defp maybe_wasm_opt(%{wasm_bindgen: true}, _config), do: :ok
 
   defp maybe_wasm_opt(_module_config, %{optimize: :none}), do: :ok
 
@@ -154,7 +154,7 @@ defmodule Exclosured.Compiler do
 
       _path ->
         name = Atom.to_string(module_config.name)
-        wasm_file = cargo_wasm_path(name, config)
+        wasm_file = Path.join([config.output_dir, name, "#{name}_bg.wasm"])
 
         opt_flag =
           case config.optimize do
@@ -168,24 +168,6 @@ defmodule Exclosured.Compiler do
           {_, 0} -> :ok
           {output, _} -> {:error, "wasm-opt failed for #{name}: #{output}"}
         end
-    end
-  end
-
-  defp copy_artifacts(%{wasm_bindgen: true}, _config) do
-    # wasm-bindgen already outputs to the right directory
-    :ok
-  end
-
-  defp copy_artifacts(module_config, config) do
-    name = Atom.to_string(module_config.name)
-    source = cargo_wasm_path(name, config)
-    dest_dir = config.output_dir
-    File.mkdir_p!(dest_dir)
-    dest = Path.join(dest_dir, "#{name}.wasm")
-
-    case File.cp(source, dest) do
-      :ok -> :ok
-      {:error, reason} -> {:error, "Failed to copy #{source} to #{dest}: #{inspect(reason)}"}
     end
   end
 
