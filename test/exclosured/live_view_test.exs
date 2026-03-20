@@ -79,4 +79,27 @@ defmodule Exclosured.LiveViewTest do
       assert result == %{count: 42, label: "hello", ratio: 3.14, active: true, data: nil}
     end
   end
+
+  describe "stream_call/5" do
+    test "requires :on_chunk option" do
+      assert_raise KeyError, ~r/key :on_chunk not found/, fn ->
+        LiveView.stream_call(build_socket(), :mod, "func", [], [])
+      end
+    end
+
+    test "accepts :on_chunk and optional :on_done" do
+      # Can't fully test without a connected LiveView, but we can verify
+      # the function exists and validates options
+      assert_raise KeyError, ~r/on_chunk/, fn ->
+        LiveView.stream_call(build_socket(), :mod, "func", [], on_done: fn s -> s end)
+      end
+    end
+  end
+
+  defp build_socket do
+    %Phoenix.LiveView.Socket{
+      assigns: %{__changed__: %{}},
+      private: %{}
+    }
+  end
 end

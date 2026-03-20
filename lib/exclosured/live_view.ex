@@ -96,6 +96,76 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     end
 
     @doc """
+    Call a WASM function that streams results back incrementally.
+
+    Instead of waiting for a single `{:wasm_result, ...}` message, this
+    sets up handlers for streaming `emit("chunk", ...)` events from WASM.
+    Each chunk triggers the `on_chunk` callback. When WASM emits `"done"`,
+    the `on_done` callback fires and the stream handler is cleaned up.
+
+    ## Options
+
+      * `:on_chunk` (required) - `fn payload, socket -> socket` called for each chunk
+      * `:on_done` - `fn socket -> socket` called when streaming completes (default: identity)
+      * `:chunk_event` - event name WASM emits for chunks (default: `"chunk"`)
+      * `:done_event` - event name WASM emits on completion (default: `"done"`)
+
+    ## Example
+
+        # In your LiveView:
+        def handle_event("analyze", %{"data" => data}, socket) do
+          socket =
+            socket
+            |> Exclosured.LiveView.stream_call(:processor, "analyze", [data],
+              on_chunk: fn chunk, socket ->
+                update(socket, :results, &[chunk | &1])
+              end,
+              on_done: fn socket ->
+                assign(socket, processing: false)
+              end
+            )
+
+          {:noreply, assign(socket, processing: true, results: [])}
+        end
+
+        # In your Rust WASM:
+        # for item in data.chunks(100) {
+        #     exclosured::emit("chunk", &process(item));
+        # }
+        # exclosured::emit("done", "{}");
+    """
+    def stream_call(socket, module, func, args, opts) do
+      on_chunk = Keyword.fetch!(opts, :on_chunk)
+      on_done = Keyword.get(opts, :on_done, fn socket -> socket end)
+      chunk_event = Keyword.get(opts, :chunk_event, "chunk")
+      done_event = Keyword.get(opts, :done_event, "done")
+
+      stream_id = {module, func, System.unique_integer([:positive])}
+
+      socket
+      |> call(module, func, args)
+      |> attach_hook(
+        {:exclosured_stream, stream_id},
+        :handle_info,
+        fn
+          {:wasm_emit, ^module, event, payload}, socket when event == chunk_event ->
+            {:halt, on_chunk.(payload, socket)}
+
+          {:wasm_emit, ^module, event, _payload}, socket when event == done_event ->
+            socket =
+              socket
+              |> on_done.()
+              |> Phoenix.LiveView.detach_hook({:exclosured_stream, stream_id}, :handle_info)
+
+            {:halt, socket}
+
+          _other, socket ->
+            {:cont, socket}
+        end
+      )
+    end
+
+    @doc """
     HEEx component that renders a WASM sandbox container element.
 
     ## Attributes
