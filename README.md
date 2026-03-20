@@ -323,6 +323,32 @@ Exclosured supports two ways to write WASM modules. Use whichever fits the task.
 | IDE support | String in Elixir | Full rust-analyzer |
 | Setup cost | Zero | Cargo workspace |
 
+## Typed Events
+
+Generate Elixir structs from annotated Rust structs. Annotate with `/// exclosured:event` and the macro generates matching Elixir modules at compile time:
+
+```rust
+// In your Rust WASM module
+/// exclosured:event
+pub struct ProgressEvent {
+    pub percent: u32,
+    pub stage: String,
+}
+```
+
+```elixir
+defmodule MyApp.Events do
+  use Exclosured.Events, source: "native/wasm/my_mod/src/lib.rs"
+end
+
+# Now use the generated structs:
+event = MyApp.Events.ProgressEvent.from_payload(payload)
+event.percent #=> 75
+event.stage   #=> "processing"
+```
+
+Rust types map to Elixir types automatically: `u32` -> `integer()`, `String` -> `String.t()`, `Vec<T>` -> `list()`, `Option<T>` -> `T | nil`.
+
 ## Elixir API
 
 ```elixir
