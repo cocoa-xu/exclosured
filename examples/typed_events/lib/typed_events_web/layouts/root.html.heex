@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="csrf-token" content={Phoenix.Controller.get_csrf_token()} />
+    <title>Typed Events - Exclosured</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+
+      body {
+        font-family: system-ui, -apple-system, sans-serif;
+        max-width: 960px;
+        margin: 0 auto;
+        padding: 2rem;
+        background: #0a0a1a;
+        color: #eee;
+      }
+
+      h1 {
+        color: #00d2ff;
+        margin-bottom: 0.25rem;
+        font-size: 1.8rem;
+      }
+
+      .subtitle {
+        color: #888;
+        margin-bottom: 1.5rem;
+        font-size: 0.95rem;
+      }
+
+      .dashboard {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+      }
+
+      .stat-card {
+        background: #111128;
+        border: 1px solid #222;
+        border-radius: 10px;
+        padding: 1.25rem;
+      }
+
+      .stat-card .label {
+        color: #888;
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 0.4rem;
+      }
+
+      .stat-card .value {
+        font-size: 1.6rem;
+        font-weight: 700;
+        color: #00d2ff;
+      }
+
+      .stat-card .value.success { color: #4ade80; }
+      .stat-card .value.warning { color: #fbbf24; }
+      .stat-card .value.error { color: #f87171; }
+
+      .pipeline-status {
+        background: #111128;
+        border: 1px solid #222;
+        border-radius: 10px;
+        padding: 1.25rem;
+        margin-bottom: 1.5rem;
+      }
+
+      .pipeline-status h2 {
+        color: #ccc;
+        font-size: 1rem;
+        margin-bottom: 0.75rem;
+      }
+
+      .status-badge {
+        display: inline-block;
+        padding: 0.3rem 0.8rem;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+
+      .status-badge.idle {
+        background: #1a1a3a;
+        color: #888;
+        border: 1px solid #333;
+      }
+
+      .status-badge.running {
+        background: #00d2ff22;
+        color: #00d2ff;
+        border: 1px solid #00d2ff44;
+        animation: pulse 1.5s ease-in-out infinite;
+      }
+
+      .status-badge.finished {
+        background: #4ade8022;
+        color: #4ade80;
+        border: 1px solid #4ade8044;
+      }
+
+      @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.6; }
+      }
+
+      .stages-section {
+        margin-bottom: 1.5rem;
+      }
+
+      .stages-section h2 {
+        color: #ccc;
+        font-size: 1rem;
+        margin-bottom: 0.75rem;
+      }
+
+      .stages-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0.75rem;
+      }
+
+      .stage-card {
+        background: #0d0d24;
+        border: 1px solid #1a1a3a;
+        border-radius: 10px;
+        padding: 1rem;
+        text-align: center;
+        transition: border-color 0.3s ease, background 0.3s ease;
+      }
+
+      .stage-card.complete {
+        border-color: #4ade8044;
+        background: #4ade8008;
+      }
+
+      .stage-card.active {
+        border-color: #00d2ff44;
+        background: #00d2ff08;
+      }
+
+      .stage-card .stage-name {
+        color: #ccc;
+        font-size: 0.9rem;
+        font-weight: 600;
+        margin-bottom: 0.4rem;
+        text-transform: capitalize;
+      }
+
+      .stage-card .stage-items {
+        color: #888;
+        font-size: 0.8rem;
+        margin-bottom: 0.2rem;
+      }
+
+      .stage-card .stage-duration {
+        color: #00d2ff;
+        font-size: 0.75rem;
+      }
+
+      .stage-card.pending .stage-name { color: #555; }
+      .stage-card.complete .stage-name { color: #4ade80; }
+
+      .controls {
+        margin-bottom: 1.5rem;
+        display: flex;
+        gap: 1rem;
+        align-items: center;
+      }
+
+      .run-btn {
+        background: #00d2ff;
+        color: #0a0a1a;
+        border: none;
+        padding: 0.6rem 1.5rem;
+        border-radius: 8px;
+        font-size: 0.95rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.15s ease;
+      }
+
+      .run-btn:hover:not(:disabled) {
+        background: #33ddff;
+      }
+
+      .run-btn:disabled {
+        background: #333;
+        color: #666;
+        cursor: not-allowed;
+      }
+
+      .item-count-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.3rem;
+      }
+
+      .item-count-group label {
+        color: #888;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+
+      .item-count-group input {
+        background: #1a1a3a;
+        border: 1px solid #333;
+        border-radius: 6px;
+        color: #eee;
+        padding: 0.4rem 0.6rem;
+        font-size: 0.9rem;
+        width: 100px;
+      }
+
+      .event-log {
+        background: #0d0d24;
+        border: 1px solid #1a1a3a;
+        border-radius: 10px;
+        padding: 1.25rem;
+        margin-bottom: 1.5rem;
+      }
+
+      .event-log h2 {
+        color: #ccc;
+        font-size: 1rem;
+        margin-bottom: 0.75rem;
+      }
+
+      .log-entries {
+        max-height: 300px;
+        overflow-y: auto;
+        font-family: "SF Mono", "Fira Code", monospace;
+        font-size: 0.8rem;
+        line-height: 1.6;
+      }
+
+      .log-entry {
+        padding: 0.3rem 0.5rem;
+        border-radius: 4px;
+        margin-bottom: 0.25rem;
+      }
+
+      .log-entry:nth-child(odd) {
+        background: #0a0a18;
+      }
+
+      .log-entry .event-type {
+        font-weight: 600;
+        margin-right: 0.5rem;
+      }
+
+      .log-entry .event-type.pipeline-started { color: #00d2ff; }
+      .log-entry .event-type.stage-complete { color: #4ade80; }
+      .log-entry .event-type.item-processed { color: #fbbf24; }
+      .log-entry .event-type.pipeline-finished { color: #c084fc; }
+
+      .log-entry .event-data {
+        color: #999;
+      }
+
+      .log-empty {
+        color: #555;
+        font-style: italic;
+        padding: 1rem;
+        text-align: center;
+      }
+
+      .how-it-works {
+        background: #0d0d24;
+        border: 1px solid #1a1a3a;
+        border-radius: 10px;
+        padding: 1.5rem;
+        margin-top: 1.5rem;
+      }
+
+      .how-it-works h2 {
+        color: #00d2ff;
+        font-size: 1.1rem;
+        margin-bottom: 0.75rem;
+      }
+
+      .how-it-works h3 {
+        color: #ccc;
+        font-size: 0.95rem;
+        margin-top: 1rem;
+        margin-bottom: 0.4rem;
+      }
+
+      .how-it-works p {
+        color: #999;
+        font-size: 0.9rem;
+        line-height: 1.5;
+        margin-bottom: 0.5rem;
+      }
+
+      .how-it-works code {
+        background: #1a1a3a;
+        color: #00d2ff;
+        padding: 0.15rem 0.4rem;
+        border-radius: 4px;
+        font-size: 0.85rem;
+      }
+
+      .how-it-works pre {
+        background: #0a0a18;
+        border: 1px solid #1a1a3a;
+        border-radius: 8px;
+        padding: 1rem;
+        overflow-x: auto;
+        margin: 0.75rem 0;
+        font-size: 0.82rem;
+        line-height: 1.5;
+        color: #ccc;
+      }
+
+      .comparison {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+        margin-top: 0.75rem;
+      }
+
+      .comparison-card {
+        background: #0a0a18;
+        border: 1px solid #1a1a3a;
+        border-radius: 8px;
+        padding: 1rem;
+      }
+
+      .comparison-card h4 {
+        font-size: 0.85rem;
+        margin-bottom: 0.5rem;
+      }
+
+      .comparison-card.before h4 { color: #f87171; }
+      .comparison-card.after h4 { color: #4ade80; }
+
+      .comparison-card pre {
+        margin: 0;
+        border: none;
+        padding: 0;
+        font-size: 0.78rem;
+      }
+
+      .status-text {
+        color: #555;
+        font-size: 0.85rem;
+        margin-top: 0.5rem;
+      }
+
+      .status-text.ready { color: #4ade80; }
+    </style>
+  </head>
+  <body>
+    <%= @inner_content %>
+    <script defer phx-track-static src={"/assets/app.js"}></script>
+  </body>
+</html>
