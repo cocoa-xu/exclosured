@@ -390,6 +390,48 @@ exclosured::broadcast("ai:result", &json_payload);
 // alloc(size) and dealloc(ptr, size) are exported automatically
 ```
 
+## Telemetry
+
+Exclosured emits `:telemetry` events for observability. Attach handlers to monitor WASM compilation and runtime operations.
+
+**Compilation events:**
+
+| Event | Measurements | Metadata |
+|---|---|---|
+| `[:exclosured, :compile, :start]` | `system_time` | `module` |
+| `[:exclosured, :compile, :stop]` | `duration` | `module`, `wasm_size` |
+| `[:exclosured, :compile, :error]` | `duration` | `module`, `error` |
+
+**Runtime events** (emitted during LiveView operation):
+
+| Event | Metadata |
+|---|---|
+| `[:exclosured, :wasm, :call]` | `module`, `func` |
+| `[:exclosured, :wasm, :result]` | `module`, `func` |
+| `[:exclosured, :wasm, :emit]` | `module`, `event` |
+| `[:exclosured, :wasm, :error]` | `module`, `func`, `error` |
+| `[:exclosured, :wasm, :ready]` | `module` |
+
+**Example: attach a logger**
+
+```elixir
+# In your application.ex start/2
+:telemetry.attach_many(
+  "exclosured-logger",
+  [
+    [:exclosured, :compile, :stop],
+    [:exclosured, :wasm, :call],
+    [:exclosured, :wasm, :emit]
+  ],
+  fn event, measurements, metadata, _config ->
+    Logger.info("[exclosured] #{inspect(event)} #{inspect(metadata)}")
+  end,
+  nil
+)
+```
+
+These events integrate directly with [Phoenix LiveDashboard](https://github.com/phoenixframework/phoenix_live_dashboard) and any `:telemetry`-based monitoring tool.
+
 ## How Exclosured Compares to Other Elixir Libraries
 
 Several Elixir libraries work with Rust or WASM. They solve different problems.

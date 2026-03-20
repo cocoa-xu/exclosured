@@ -10,12 +10,29 @@ defmodule Exclosured.Compiler do
   Compiles a single WASM module. Returns :ok or {:error, reason}.
   """
   def compile_module(module_config, config) do
-    with :ok <- check_prerequisites(),
-         :ok <- cargo_build(module_config, config),
-         :ok <- run_wasm_bindgen(module_config, config),
-         :ok <- maybe_wasm_opt(module_config, config) do
-      :ok
+    start_time = System.monotonic_time()
+    Exclosured.Telemetry.compile_start(module_config.name)
+
+    result =
+      with :ok <- check_prerequisites(),
+           :ok <- cargo_build(module_config, config),
+           :ok <- run_wasm_bindgen(module_config, config),
+           :ok <- maybe_wasm_opt(module_config, config) do
+        :ok
+      end
+
+    case result do
+      :ok ->
+        name = Atom.to_string(module_config.name)
+        wasm_path = Path.join([config.output_dir, name, "#{name}_bg.wasm"])
+        wasm_size = if File.exists?(wasm_path), do: File.stat!(wasm_path).size
+        Exclosured.Telemetry.compile_stop(module_config.name, start_time, wasm_size: wasm_size)
+
+      {:error, message} ->
+        Exclosured.Telemetry.compile_error(module_config.name, start_time, message)
     end
+
+    result
   end
 
   @doc """

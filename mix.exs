@@ -27,6 +27,7 @@ defmodule Exclosured.MixProject do
       {:phoenix, "~> 1.7", optional: true},
       {:phoenix_live_view, "~> 1.0", optional: true},
       {:jason, "~> 1.0"},
+      {:telemetry, "~> 1.0"},
       {:file_system, "~> 1.0", only: :dev, optional: true},
       {:ex_doc, "~> 0.34", only: :dev, runtime: false}
     ]

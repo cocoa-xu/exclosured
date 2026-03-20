@@ -72,8 +72,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     Call a WASM function on the client. The result will arrive as a
     `{:wasm_result, module, func, result}` message via `handle_info/2`.
     """
-    def call(socket, _module, func, args, _opts \\ []) do
+    def call(socket, module, func, args, _opts \\ []) do
       ref = System.unique_integer([:positive]) |> Integer.to_string()
+      Exclosured.Telemetry.wasm_call(module, func)
 
       socket
       |> ensure_wasm_hook()
@@ -237,6 +238,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     defp handle_wasm_event("wasm:result", %{"module" => module, "func" => func, "result" => result}, socket) do
       with {:ok, mod_atom} <- safe_atom(module) do
+        Exclosured.Telemetry.wasm_result(mod_atom, func)
         send(self(), {:wasm_result, mod_atom, func, result})
       end
 
@@ -245,6 +247,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     defp handle_wasm_event("wasm:emit", %{"module" => module, "event" => event, "payload" => payload}, socket) do
       with {:ok, mod_atom} <- safe_atom(module) do
+        Exclosured.Telemetry.wasm_emit(mod_atom, event)
         send(self(), {:wasm_emit, mod_atom, event, payload})
       end
 
@@ -253,6 +256,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     defp handle_wasm_event("wasm:error", %{"module" => module, "func" => func, "error" => error}, socket) do
       with {:ok, mod_atom} <- safe_atom(module) do
+        Exclosured.Telemetry.wasm_error(mod_atom, func, error)
         send(self(), {:wasm_error, mod_atom, func, error})
       end
 
@@ -261,6 +265,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     defp handle_wasm_event("wasm:ready", %{"module" => module}, socket) do
       with {:ok, mod_atom} <- safe_atom(module) do
+        Exclosured.Telemetry.wasm_ready(mod_atom)
         send(self(), {:wasm_ready, mod_atom})
       end
 
