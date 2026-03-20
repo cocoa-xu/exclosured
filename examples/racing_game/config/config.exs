@@ -30,7 +30,7 @@ config :esbuild,
 
 config :exclosured,
   modules: [
-    race_client: [mode: :compute]
+    race_client: []
   ]
 
 config :logger, level: :info

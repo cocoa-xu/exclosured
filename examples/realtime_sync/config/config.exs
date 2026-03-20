@@ -30,7 +30,7 @@ config :esbuild,
 
 config :exclosured,
   modules: [
-    sync_client: [mode: :compute]
+    sync_client: []
   ]
 
 config :logger, level: :info

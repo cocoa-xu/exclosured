@@ -30,7 +30,7 @@ config :esbuild,
 
 config :exclosured,
   modules: [
-    renderer: [mode: :interactive, canvas: true, wasm_bindgen: true]
+    renderer: [canvas: true]
   ]
 
 config :logger, level: :info

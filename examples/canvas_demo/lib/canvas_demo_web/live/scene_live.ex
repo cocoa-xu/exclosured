@@ -51,7 +51,7 @@ defmodule CanvasDemoWeb.SceneLive do
       id="wasm-renderer"
       phx-hook="Exclosured"
       data-wasm-module="renderer"
-      data-wasm-mode="interactive"
+
       data-wasm-width="800"
       data-wasm-height="500"
     >

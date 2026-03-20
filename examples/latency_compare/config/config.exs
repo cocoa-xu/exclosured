@@ -30,7 +30,7 @@ config :esbuild,
 
 config :exclosured,
   modules: [
-    image_filter: [mode: :compute]
+    image_filter: []
   ]
 
 config :logger, level: :info

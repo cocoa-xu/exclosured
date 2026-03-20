@@ -30,7 +30,7 @@ config :esbuild,
 
 config :exclosured,
   modules: [
-    text_engine: [mode: :compute]
+    text_engine: []
   ]
 
 config :logger, level: :info
