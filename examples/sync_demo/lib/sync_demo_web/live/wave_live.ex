@@ -78,13 +78,7 @@ defmodule SyncDemoWeb.WaveLive do
     <div class="canvas-container">
       <Exclosured.LiveView.sandbox
         module={:visualizer}
-        sync={%{
-          frequency: @frequency,
-          amplitude: @amplitude,
-          speed: @speed,
-          color: @color,
-          wave_type: @wave_type
-        }}
+        sync={Exclosured.LiveView.sync(assigns, ~w(frequency amplitude speed color wave_type)a)}
         canvas
         width={600}
         height={300}

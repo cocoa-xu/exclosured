@@ -181,7 +181,7 @@ LiveView assigns automatically flow to WASM via the `sync` attribute. No manual 
 ```heex
 <Exclosured.LiveView.sandbox
   module={:visualizer}
-  sync={%{frequency: @frequency, amplitude: @amplitude, speed: @speed, color: @color}}
+  sync={Exclosured.LiveView.sync(assigns, ~w(frequency amplitude speed color)a)}
   canvas
 />
 ```

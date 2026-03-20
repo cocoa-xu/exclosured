@@ -45,6 +45,24 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     import Phoenix.LiveView, only: [push_event: 3, attach_hook: 4, connected?: 1]
 
     @doc """
+    Build a sync map from assigns using a list of keys.
+
+    Shorthand for building the `sync` attribute on the `sandbox` component.
+
+        <%# Instead of: %>
+        sync={%{frequency: @frequency, amplitude: @amplitude, speed: @speed}}
+
+        <%# Write: %>
+        sync={sync(assigns, ~w(frequency amplitude speed)a)}
+
+        <%# Or with the sigil: %>
+        sync={sync(assigns, [:frequency, :amplitude, :speed])}
+    """
+    def sync(assigns, keys) when is_list(keys) do
+      Map.new(keys, fn key -> {key, assigns[key]} end)
+    end
+
+    @doc """
     Call a WASM function on the client. The result will arrive as a
     `{:wasm_result, module, func, result}` message via `handle_info/2`.
     """
