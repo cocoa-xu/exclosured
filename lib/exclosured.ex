@@ -43,8 +43,12 @@ defmodule Exclosured do
   @doc """
   Returns the URL for an asset file associated with a module.
   """
-  def asset_url(module_name, filename) when is_atom(module_name) do
-    "/wasm/assets/#{module_name}/#{filename}"
+  def asset_url(module_name, filename) when is_atom(module_name) and is_binary(filename) do
+    if String.contains?(filename, ["../", "..\\"]) do
+      raise ArgumentError, "filename must not contain path traversal sequences"
+    end
+
+    "/wasm/assets/#{module_name}/#{Path.basename(filename)}"
   end
 
   @doc """

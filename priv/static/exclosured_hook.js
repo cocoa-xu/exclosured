@@ -25,11 +25,15 @@ const ExclosuredHook = {
       // will call into (emit_event, broadcast_event).
       window.__exclosured = {
         emit_event: (event, payload) => {
-          this.pushEvent("wasm:emit", {
-            module: name,
-            event: event,
-            payload: JSON.parse(payload),
-          });
+          try {
+            this.pushEvent("wasm:emit", {
+              module: name,
+              event: event,
+              payload: JSON.parse(payload),
+            });
+          } catch (e) {
+            console.error("Exclosured: invalid JSON in emit payload", e);
+          }
         },
 
         broadcast_event: (channel, data) => {

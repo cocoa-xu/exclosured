@@ -25,6 +25,10 @@ defmodule Mix.Tasks.Exclosured.Init do
 
     module_name = Keyword.get(opts, :module, "example")
 
+    unless Regex.match?(~r/^[a-z_][a-z0-9_]*$/, module_name) do
+      Mix.raise("Invalid module name: #{inspect(module_name)}. Must match [a-z_][a-z0-9_]*.")
+    end
+
     source_dir = Application.get_env(:exclosured, :source_dir, "native/wasm")
 
     create_workspace(source_dir, module_name)

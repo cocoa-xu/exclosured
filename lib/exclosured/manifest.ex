@@ -22,7 +22,7 @@ defmodule Exclosured.Manifest do
     case File.read(path()) do
       {:ok, content} ->
         content
-        |> :erlang.binary_to_term()
+        |> :erlang.binary_to_term([:safe])
         |> migrate()
 
       {:error, _} ->
