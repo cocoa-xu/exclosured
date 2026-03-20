@@ -6,7 +6,22 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     Provides `call/5` to invoke WASM functions from a LiveView process,
     and `sandbox/1` as a HEEx component for embedding WASM modules.
 
-    ## Usage
+    ## Declarative State Sync
+
+    The `sandbox` component supports a `sync` attribute that automatically
+    pushes assign changes to the WASM module:
+
+        <Exclosured.LiveView.sandbox
+          module={:renderer}
+          sync={%{speed: @speed, color: @color}}
+          canvas
+        />
+
+    When `@speed` or `@color` changes, the new values are automatically
+    pushed to the WASM module via `wasm:state`. No manual `push_event`
+    calls needed.
+
+    ## Manual Usage
 
         defmodule MyAppWeb.ProcessorLive do
           use Phoenix.LiveView
@@ -32,10 +47,6 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     @doc """
     Call a WASM function on the client. The result will arrive as a
     `{:wasm_result, module, func, result}` message via `handle_info/2`.
-
-    ## Options
-
-      * `:timeout` - not enforced server-side, but can be used by the caller
     """
     def call(socket, _module, func, args, _opts \\ []) do
       ref = System.unique_integer([:positive]) |> Integer.to_string()
@@ -67,6 +78,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
       * `module` (required) - The WASM module name (atom)
       * `id` - Element ID (defaults to "wasm-{module}")
+      * `sync` - Map of values to auto-sync to WASM on change (default: nil).
+        When any value in the map changes between renders, the component
+        pushes the entire sync map to the WASM module via `wasm:state`.
       * `canvas` - Whether to include a canvas element (default: false)
       * `width` - Canvas width (default: 800)
       * `height` - Canvas height (default: 600)
@@ -75,6 +89,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     """
     attr(:module, :atom, required: true)
     attr(:id, :string, default: nil)
+    attr(:sync, :map, default: nil)
     attr(:canvas, :boolean, default: false)
     attr(:width, :integer, default: 800)
     attr(:height, :integer, default: 600)
@@ -91,6 +106,12 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             channels -> Enum.join(channels, ",")
           end
         end)
+        |> assign_new(:sync_json, fn ->
+          case assigns.sync do
+            nil -> nil
+            map when is_map(map) -> Jason.encode!(map)
+          end
+        end)
 
       ~H"""
       <div
@@ -98,6 +119,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         phx-hook="Exclosured"
         data-wasm-module={@module}
         data-wasm-subscribe={@subscribe_str}
+        data-wasm-sync={@sync_json}
         data-wasm-width={if @canvas, do: @width}
         data-wasm-height={if @canvas, do: @height}
         class={@class}

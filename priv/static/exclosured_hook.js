@@ -94,6 +94,9 @@ const ExclosuredHook = {
       // Set up inter-module subscriptions
       this._setupSubscriptions();
 
+      // Apply initial sync data if present
+      this._applySyncData();
+
       // Notify server that WASM is ready
       this.pushEvent("wasm:ready", { module: name });
     } catch (err) {
@@ -120,6 +123,31 @@ const ExclosuredHook = {
       window.__exclosured_bus.addEventListener(channel, handler);
       this._subscriptions.push({ channel, handler });
     });
+  },
+
+  // Declarative state sync: when LiveView re-renders the component with
+  // new sync data, this callback fires and pushes the update to WASM.
+  updated() {
+    this._applySyncData();
+  },
+
+  _applySyncData() {
+    const syncAttr = this.el.dataset.wasmSync;
+    if (!syncAttr || !this.wasmBindgen) return;
+
+    // Only push if the data actually changed
+    if (syncAttr === this._lastSyncData) return;
+    this._lastSyncData = syncAttr;
+
+    try {
+      const state = JSON.parse(syncAttr);
+      if (this.wasmBindgen.apply_state) {
+        const encoder = new TextEncoder();
+        this.wasmBindgen.apply_state(encoder.encode(JSON.stringify(state)));
+      }
+    } catch (e) {
+      console.error("Exclosured: invalid sync data", e);
+    }
   },
 
   _createCanvas() {
