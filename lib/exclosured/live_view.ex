@@ -48,18 +48,24 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     Build a sync map from assigns using a list of keys.
 
     Shorthand for building the `sync` attribute on the `sandbox` component.
+    Bare atoms use the same name as the assign key. Keyword pairs map an
+    assign to a different key name.
 
-        <%# Instead of: %>
-        sync={%{frequency: @frequency, amplitude: @amplitude, speed: @speed}}
-
-        <%# Write: %>
+        <%# Same-name shorthand: %>
         sync={sync(assigns, ~w(frequency amplitude speed)a)}
 
-        <%# Or with the sigil: %>
-        sync={sync(assigns, [:frequency, :amplitude, :speed])}
+        <%# Mixed: four same-name, one renamed: %>
+        sync={sync(assigns, [:frequency, :amplitude, :speed, :color, wave: :wave_type])}
+
+        <%# The above produces: %>
+        %{frequency: @frequency, amplitude: @amplitude, speed: @speed,
+          color: @color, wave: @wave_type}
     """
     def sync(assigns, keys) when is_list(keys) do
-      Map.new(keys, fn key -> {key, assigns[key]} end)
+      Map.new(keys, fn
+        {target_key, assign_key} -> {target_key, assigns[assign_key]}
+        key when is_atom(key) -> {key, assigns[key]}
+      end)
     end
 
     @doc """
