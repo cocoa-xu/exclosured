@@ -185,22 +185,25 @@ let liveSocket = new LiveSocket("/live", Socket, {
 
 ## Examples
 
-Ten complete Phoenix applications in `examples/`, each with its own README explaining motivation, trade-offs, and when to use the pattern.
+Thirteen example applications in `examples/`, each with its own README.
 
-| # | Demo | Port | What it shows |
-|---|---|---|---|
-| 1 | Inline WASM | (code only) | `defwasm` macro, zero setup |
-| 2 | [Text Processing](examples/wasm_ai/) | 4001 | Compute offload, progress events |
-| 3 | [Interactive Canvas](examples/canvas_demo/) | 4002 | 60fps wasm-bindgen rendering, PubSub sync |
-| 4 | [State Sync](examples/sync_demo/) | 4008 | Declarative `sync` attribute, wave visualizer |
-| 5 | [Image Editor](examples/realtime_sync/) | 4003 | Collaborative editing, WASM as source of truth |
-| 6 | [Racing Game](examples/racing_game/) | 4004 | Server-authoritative multiplayer, anti-cheat |
-| 7 | [Offload Compute](examples/offload_compute/) | 4005 | Server vs WASM side-by-side timing |
-| 8 | [Confidential Compute](examples/confidential_compute/) | 4006 | PII stays in browser, server sees only results |
-| 9 | [Latency Compare](examples/latency_compare/) | 4007 | Server round-trip vs local WASM, feel the difference |
-| 10 | [**Private Analytics**](examples/private_analytics/) | 4011 | E2E encrypted multi-user analytics with DuckDB-WASM, PII masking, Rust LiveView hooks, cursor presence |
+| # | Demo | What it shows |
+|---|---|---|
+| 1 | Inline WASM | `defwasm` macro, zero setup |
+| 2 | [Text Processing](examples/wasm_ai/) | Compute offload, progress events |
+| 3 | [Interactive Canvas](examples/canvas_demo/) | 60fps wasm-bindgen rendering, PubSub sync |
+| 4 | [State Sync](examples/sync_demo/) | Declarative `sync` attribute, wave visualizer |
+| 5 | [Image Editor](examples/realtime_sync/) | Collaborative editing, WASM as source of truth |
+| 6 | [Racing Game](examples/racing_game/) | Server-authoritative multiplayer, anti-cheat |
+| 7 | [Offload Compute](examples/offload_compute/) | Server vs WASM side-by-side timing |
+| 8 | [Confidential Compute](examples/confidential_compute/) | PII stays in browser, server sees only results |
+| 9 | [Latency Compare](examples/latency_compare/) | Server round-trip vs local WASM |
+| 10 | [**Private Analytics**](examples/private_analytics/) | E2E encrypted analytics, DuckDB-WASM, Rust hooks |
+| 11 | [LiveVue + WASM](examples/live_vue_wasm/) | Vue.js integration, real-time stats dashboard |
+| 12 | [LiveSvelte + WASM](examples/live_svelte_wasm/) | Svelte integration, WASM markdown editor |
+| 13 | [Kino Data Explorer](examples/kino_exclosured/) | Livebook smart cell, WASM stats with JS fallback |
 
-To run any demo: `cd examples/<name> && mix deps.get && mix compile && mix phx.server`
+Most demos run with `cd examples/<name> && mix setup && mix phx.server`. Some examples require additional setup (npm, Vite, etc.); see each example's README for details.
 
 ## Inline vs Full Workspace
 

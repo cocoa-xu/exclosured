@@ -1,0 +1,260 @@
+# Data Explorer with Exclosured WASM
+
+```elixir
+case System.find_executable("cargo") do
+  nil ->
+    IO.puts("""
+    \e[31m[ERROR] `cargo` not found in PATH.\e[0m
+
+    Exclosured needs the Rust toolchain to compile WASM modules.
+
+    Livebook does not inherit your shell's PATH. You need to set the
+    PATH environment variable in Livebook so it can find `cargo`:
+
+      Settings > Environment variables > New
+      (or visit http://localhost:<port>/settings/env-var/new)
+
+    Make sure the PATH includes the directory where `cargo` is installed
+    (typically ~/.cargo/bin). Reconnect the runtime after saving.
+    """)
+    raise "cargo not found. See instructions above."
+
+  path ->
+    IO.puts("Found cargo at #{path}")
+end
+
+Mix.install([
+  {:kino_exclosured, path: __DIR__},
+  {:kino, "~> 0.14"}
+])
+```
+
+## Inline WASM Calculator
+
+A minimal demo: define Rust inline with `defwasm`, compile to WASM,
+embed the binary in a Kino widget, and compute `a + b` in the browser.
+Inputs sync between all connected Livebook users.
+
+```elixir
+defmodule Demo.WasmAdd do
+  use Exclosured.Inline
+  defwasm :add, args: [a: :i32, b: :i32], do: "return a + b;"
+end
+
+defmodule Demo.CalcWidget do
+  @main_js ~S"""
+  export function init(ctx, payload) {
+    const s = (k, v) => `${k}:${v}`;
+    const input_style = [s("width","80px"), s("padding","0.5rem"), s("border-radius","8px"),
+      s("border","1px solid #333"), s("background","#0d1117"), s("color","#e0e0e0"),
+      s("font-size","1.1rem"), s("text-align","center")].join(";");
+
+    ctx.root.innerHTML = `
+      <div style="font-family:system-ui;background:#1a1a2e;color:#e0e0e0;padding:1.5rem;border-radius:12px;max-width:420px">
+        <div style="font-size:0.75rem;color:#666;margin-bottom:1rem;display:flex;justify-content:space-between">
+          <span>Rust/WASM Calculator</span>
+          <span id="badge" style="color:#d29922">loading...</span>
+        </div>
+        <div style="display:flex;gap:0.75rem;align-items:center">
+          <input id="a" type="number" value="0" style="${input_style}" />
+          <span style="font-size:1.5rem;color:#666">+</span>
+          <input id="b" type="number" value="0" style="${input_style}" />
+          <span style="font-size:1.5rem;color:#666">=</span>
+          <span id="result" style="font-size:1.5rem;font-weight:700;color:#66d9ef;min-width:60px">0</span>
+        </div>
+      </div>`;
+
+    let wasm = null;
+    const $ = (sel) => ctx.root.querySelector(sel);
+    const inputA = $("#a"), inputB = $("#b"), result = $("#result"), badge = $("#badge");
+
+    (async () => {
+      try {
+        if (!payload.wasm_b64) throw new Error("No WASM binary");
+        const bin = Uint8Array.from(atob(payload.wasm_b64), c => c.charCodeAt(0));
+        const key = "./" + payload.module_name + "_bg.js";
+        const imports = { [key]: {
+          __wbindgen_init_externref_table() {
+            const t = wasm.__wbindgen_externrefs;
+            if (!t) return;
+            const o = t.grow(4);
+            t.set(0, undefined); t.set(o, undefined); t.set(o+1, null); t.set(o+2, true); t.set(o+3, false);
+          }
+        }};
+        const { instance } = await WebAssembly.instantiate(bin, imports);
+        wasm = instance.exports;
+        if (wasm.__wbindgen_start) wasm.__wbindgen_start();
+        badge.textContent = "WASM ready";
+        badge.style.color = "#3fb950";
+        compute();
+      } catch (e) {
+        badge.textContent = "WASM failed";
+        badge.style.color = "#f85149";
+        console.error("WASM init:", e);
+      }
+    })();
+
+    function compute() {
+      const a = parseInt(inputA.value) || 0, b = parseInt(inputB.value) || 0;
+      result.textContent = wasm ? wasm.add(a, b) : a + b;
+    }
+
+    let pending = false;
+    function onInput() {
+      compute();
+      pending = true;
+      ctx.pushEvent("update", { a: parseInt(inputA.value) || 0, b: parseInt(inputB.value) || 0 });
+      setTimeout(() => { pending = false; }, 100);
+    }
+    inputA.addEventListener("input", onInput);
+    inputB.addEventListener("input", onInput);
+
+    ctx.handleEvent("sync", (data) => {
+      if (!pending) { inputA.value = data.a; inputB.value = data.b; }
+      compute();
+    });
+  }
+  """
+
+  @js_dir Path.join(System.tmp_dir!(), "wasm_calc_#{:erlang.unique_integer([:positive])}")
+  File.mkdir_p!(@js_dir)
+  File.write!(Path.join(@js_dir, "main.js"), @main_js)
+
+  use Kino.JS, assets_path: @js_dir
+  use Kino.JS.Live
+
+  def new do
+    wasm_b64 = Base.encode64(File.read!(Demo.WasmAdd.wasm_path()))
+    Kino.JS.Live.new(__MODULE__, %{
+      wasm_b64: wasm_b64,
+      module_name: Demo.WasmAdd.wasm_module_name(),
+      a: 0, b: 0
+    })
+  end
+
+  @impl true
+  def init(data, ctx), do: {:ok, assign(ctx, data: data)}
+
+  @impl true
+  def handle_connect(ctx), do: {:ok, ctx.assigns.data, ctx}
+
+  @impl true
+  def handle_event("update", %{"a" => a, "b" => b}, ctx) do
+    ctx = assign(ctx, data: %{ctx.assigns.data | a: a, b: b})
+    broadcast_event(ctx, "sync", %{a: a, b: b})
+    {:noreply, ctx}
+  end
+end
+
+Demo.CalcWidget.new()
+```
+
+## Introduction
+
+This notebook demonstrates **Kino.Exclosured**, a custom Kino widget that
+provides an interactive data explorer inside Livebook.
+
+Features:
+
+* **Sortable columns** -- click any column header to sort ascending/descending
+* **Per-column filters** -- choose an operator (contains, =, >, <) and type a value
+* **Column statistics** -- select a numeric column to see count, min, max, mean,
+  median, standard deviation, P25, and P75
+* **Histogram** -- a visual bar chart showing the distribution of numeric values
+* **Pagination** -- browse large datasets page by page
+* **Multi-user sync** -- all connected Livebook users see the same filter, sort,
+  and analysis state in real time
+
+When the WASM module compiled by `KinoExclosured.Stats` is available, statistics
+and histograms run in WebAssembly. Otherwise a pure JavaScript fallback handles
+all math. The badge in the header shows **WASM** or **JS** to indicate which
+engine is active.
+
+## Generate Sample Data
+
+```elixir
+data =
+  for i <- 1..200 do
+    %{
+      id: i,
+      name: "Item #{i}",
+      value: (:rand.uniform() * 1000) |> Float.round(2),
+      category: Enum.random(["Electronics", "Clothing", "Food", "Books", "Sports"]),
+      score: :rand.uniform(100),
+      in_stock: Enum.random([true, false])
+    }
+  end
+
+Kino.nothing()
+```
+
+## Explore the Data
+
+Use the widget below to explore the generated dataset. Try clicking column
+headers to sort, typing in the filter inputs, and selecting a numeric column
+from the dropdown to view statistics and a histogram.
+
+```elixir
+Kino.Exclosured.new(data, title: "Product Catalog", page_size: 20)
+```
+
+## Employee Dataset
+
+A smaller, hand-crafted dataset to show how the widget handles different
+data shapes.
+
+```elixir
+employees = [
+  %{name: "Alice", age: 30, salary: 75_000, department: "Engineering"},
+  %{name: "Bob", age: 25, salary: 62_000, department: "Marketing"},
+  %{name: "Carol", age: 35, salary: 88_000, department: "Engineering"},
+  %{name: "Dave", age: 28, salary: 71_000, department: "Sales"},
+  %{name: "Eve", age: 32, salary: 95_000, department: "Engineering"},
+  %{name: "Frank", age: 40, salary: 105_000, department: "Management"},
+  %{name: "Grace", age: 27, salary: 67_000, department: "Marketing"},
+  %{name: "Hank", age: 33, salary: 82_000, department: "Sales"},
+  %{name: "Iris", age: 29, salary: 73_000, department: "Engineering"},
+  %{name: "Jack", age: 45, salary: 120_000, department: "Management"},
+  %{name: "Karen", age: 31, salary: 78_000, department: "Sales"},
+  %{name: "Leo", age: 26, salary: 64_000, department: "Marketing"}
+]
+
+Kino.Exclosured.new(employees, title: "Employee Data", page_size: 10)
+```
+
+## Normal Distribution
+
+This example generates normally distributed data so the histogram shows
+a recognizable bell curve shape.
+
+```elixir
+normal_data =
+  for i <- 1..500 do
+    # Box-Muller transform to generate approximately normal values
+    u1 = :rand.uniform()
+    u2 = :rand.uniform()
+    z = :math.sqrt(-2.0 * :math.log(u1)) * :math.cos(2.0 * :math.pi() * u2)
+    value = (100 + z * 15) |> Float.round(2)
+
+    %{
+      id: i,
+      measurement: value,
+      group: Enum.random(["Control", "Treatment"])
+    }
+  end
+
+Kino.Exclosured.new(normal_data, title: "Normal Distribution (mean=100, sd=15)", page_size: 25)
+```
+
+## Keyword List Input
+
+The widget also accepts keyword lists instead of maps.
+
+```elixir
+kw_data =
+  for i <- 1..50 do
+    [id: i, x: :rand.uniform(100), y: :rand.uniform(100)]
+  end
+
+Kino.Exclosured.new(kw_data, title: "Keyword List Data", page_size: 15)
+```

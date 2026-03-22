@@ -1,0 +1,281 @@
+/*
+ * Kino.Exclosured - Data Explorer Widget Styles
+ *
+ * This CSS is loaded by Kino.JS via ctx.importCSS("main.css").
+ * It provides the visual styling for the data explorer widget
+ * rendered by main.js.
+ */
+
+.ke-container {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  max-width: 100%;
+  color: #1a1a2e;
+}
+
+/* -- Header -- */
+
+.ke-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.ke-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.ke-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+  text-transform: uppercase;
+}
+
+.ke-badge-wasm {
+  background: #d4edda;
+  color: #155724;
+}
+
+.ke-badge-js {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.ke-row-count {
+  font-size: 13px;
+  color: #666;
+  margin-left: auto;
+}
+
+/* -- Toolbar -- */
+
+.ke-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.ke-label {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.ke-select {
+  padding: 4px 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+/* -- Statistics panel -- */
+
+.ke-stats-panel {
+  margin-bottom: 12px;
+}
+
+.ke-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.ke-stat {
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 6px;
+  padding: 8px 12px;
+  text-align: center;
+}
+
+.ke-stat-label {
+  display: block;
+  font-size: 11px;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.ke-stat-value {
+  display: block;
+  font-size: 16px;
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+.ke-note {
+  font-size: 13px;
+  color: #666;
+  font-style: italic;
+}
+
+/* -- Histogram -- */
+
+.ke-histogram {
+  margin-bottom: 16px;
+}
+
+.ke-hist-title {
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+
+.ke-hist-chart {
+  display: flex;
+  align-items: flex-end;
+  height: 120px;
+  border-bottom: 1px solid #ccc;
+  border-left: 1px solid #ccc;
+  padding: 0 2px;
+}
+
+.ke-hist-bar-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  height: 100%;
+  padding: 0 1px;
+}
+
+.ke-hist-bar {
+  width: 80%;
+  background: #4a90d9;
+  border-radius: 2px 2px 0 0;
+  min-height: 1px;
+  transition: height 0.2s;
+}
+
+.ke-hist-bar-wrap:hover .ke-hist-bar {
+  background: #2d6cb4;
+}
+
+.ke-hist-count {
+  font-size: 9px;
+  color: #888;
+  margin-top: 2px;
+}
+
+.ke-hist-axis {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #888;
+  margin-top: 4px;
+}
+
+/* -- Filter bar -- */
+
+.ke-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 8px;
+  background: #f8f9fa;
+  border-radius: 6px;
+}
+
+.ke-filter-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ke-filter-label {
+  font-size: 12px;
+  font-weight: 500;
+  min-width: 60px;
+}
+
+.ke-filter-op {
+  font-size: 12px;
+  padding: 2px 4px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+}
+
+.ke-filter-input {
+  font-size: 12px;
+  padding: 3px 6px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  width: 100px;
+}
+
+/* -- Table -- */
+
+.ke-table-wrap {
+  overflow-x: auto;
+  margin-bottom: 12px;
+}
+
+.ke-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.ke-th {
+  text-align: left;
+  padding: 8px 12px;
+  background: #f1f3f5;
+  border-bottom: 2px solid #dee2e6;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.ke-th:hover {
+  background: #e2e6ea;
+}
+
+.ke-td {
+  padding: 6px 12px;
+  border-bottom: 1px solid #eee;
+}
+
+.ke-empty {
+  text-align: center;
+  padding: 24px;
+  color: #999;
+}
+
+/* -- Pagination -- */
+
+.ke-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.ke-btn {
+  padding: 4px 12px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background: white;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.ke-btn:hover:not(:disabled) {
+  background: #f1f3f5;
+}
+
+.ke-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.ke-page-info {
+  font-size: 13px;
+  color: #666;
+}

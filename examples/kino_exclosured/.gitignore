@@ -1,0 +1,16 @@
+# Build artifacts
+/_build/
+/deps/
+
+# Generated WASM output
+/priv/static/wasm/
+
+# OS files
+.DS_Store
+
+# Editor files
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
