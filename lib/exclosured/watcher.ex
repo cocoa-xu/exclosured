@@ -63,6 +63,7 @@ defmodule Exclosured.Watcher do
     {:noreply, state}
   end
 
+  @impl true
   def handle_info(:poll, state) do
     current_mtimes = collect_all_mtimes(state.config)
 
@@ -74,6 +75,7 @@ defmodule Exclosured.Watcher do
     {:noreply, %{state | last_mtimes: current_mtimes}}
   end
 
+  @impl true
   def handle_info(_msg, state), do: {:noreply, state}
 
   defp should_recompile?(path) do

@@ -55,8 +55,11 @@ defmodule Exclosured.Inline do
 
   ## Options
 
-    * `:args`: keyword list of `name: type` (default: `[]`)
-    * `:return`: return type (default: `:i32`)
+    * `:args` - keyword list of `name: type` (default: `[]`)
+    * `:return` - return type (default: `:i32`)
+    * `:deps` - list of extra Cargo dependencies as `{name, version}` tuples
+      (default: `[]`). These are added to the generated `Cargo.toml`.
+      Example: `deps: [{"serde", "1"}, {"serde_json", "1"}]`
   """
   defmacro defwasm(name, opts, do: {:__block__, _, [rust_code]})
            when is_binary(rust_code) do

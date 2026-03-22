@@ -44,6 +44,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     use Phoenix.Component
     import Phoenix.LiveView, only: [push_event: 3, attach_hook: 4, connected?: 1]
 
+    require Logger
+
     @doc """
     Build a sync map from assigns using a list of keys.
 
@@ -94,30 +96,21 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       fallback = Keyword.get(opts, :fallback)
       wasm_ready? = wasm_ready?(socket, module)
 
-      cond do
-        wasm_ready? ->
-          ref = System.unique_integer([:positive]) |> Integer.to_string()
-          Exclosured.Telemetry.wasm_call(module, func)
+      if !wasm_ready? && fallback != nil do
+        result = fallback.(args)
+        Exclosured.Telemetry.wasm_call(module, func)
+        Exclosured.Telemetry.wasm_result(module, func)
+        send(self(), {:wasm_result, module, func, result})
+        socket
+      else
+        # Either WASM is ready, or no fallback is available.
+        # Push the call to the client; it will execute when WASM loads.
+        ref = System.unique_integer([:positive]) |> Integer.to_string()
+        Exclosured.Telemetry.wasm_call(module, func)
 
-          socket
-          |> ensure_wasm_hook()
-          |> push_event("wasm:call", %{func: func, args: args, ref: ref})
-
-        fallback != nil ->
-          result = fallback.(args)
-          Exclosured.Telemetry.wasm_call(module, func)
-          Exclosured.Telemetry.wasm_result(module, func)
-          send(self(), {:wasm_result, module, func, result})
-          socket
-
-        true ->
-          # No WASM, no fallback. Push the call anyway; it will execute when WASM loads.
-          ref = System.unique_integer([:positive]) |> Integer.to_string()
-          Exclosured.Telemetry.wasm_call(module, func)
-
-          socket
-          |> ensure_wasm_hook()
-          |> push_event("wasm:call", %{func: func, args: args, ref: ref})
+        socket
+        |> ensure_wasm_hook()
+        |> push_event("wasm:call", %{func: func, args: args, ref: ref})
       end
     end
 
@@ -278,7 +271,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         socket
       end
     rescue
-      _ -> socket
+      e ->
+        Logger.error("Exclosured: failed to attach wasm hook: #{Exception.message(e)}")
+        socket
     end
 
     defp handle_wasm_event(

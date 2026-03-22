@@ -114,7 +114,7 @@ defmodule Mix.Tasks.Exclosured.Init do
 
     [dependencies]
     wasm-bindgen = "0.2"
-    exclosured_guest = { path = "../../native/exclosured_guest" }
+    exclosured_guest = "0.1"
     """
   end
 

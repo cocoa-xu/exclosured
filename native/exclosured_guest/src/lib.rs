@@ -47,8 +47,15 @@ pub fn broadcast(channel: &str, data: &str) {
 ///
 /// Called by the JS host to allocate space before writing data
 /// (strings, binary blobs) into WASM memory.
+///
+/// Returns an aligned, non-null pointer even for size 0.
 #[no_mangle]
 pub extern "C" fn alloc(size: usize) -> *mut u8 {
+    if size == 0 {
+        // Return a well-aligned dangling pointer instead of
+        // invoking the allocator with a zero-size layout.
+        return core::mem::align_of::<u8>() as *mut u8;
+    }
     let mut buf = Vec::with_capacity(size);
     let ptr = buf.as_mut_ptr();
     core::mem::forget(buf);
@@ -56,8 +63,13 @@ pub extern "C" fn alloc(size: usize) -> *mut u8 {
 }
 
 /// Deallocate memory previously allocated with `alloc`.
+///
+/// Skips deallocation for size 0 (which returns a dangling pointer from `alloc`).
 #[no_mangle]
 pub extern "C" fn dealloc(ptr: *mut u8, size: usize) {
+    if size == 0 {
+        return;
+    }
     unsafe {
         drop(Vec::from_raw_parts(ptr, 0, size));
     }
