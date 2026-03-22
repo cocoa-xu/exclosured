@@ -106,11 +106,12 @@ defmodule Exclosured.EventsTest do
     end
 
     test "collision event has correct fields" do
-      event = TestEvents.CollisionEvent.from_payload(%{
-        "npc_id" => 42,
-        "player_lane" => 1,
-        "speed" => 3.14
-      })
+      event =
+        TestEvents.CollisionEvent.from_payload(%{
+          "npc_id" => 42,
+          "player_lane" => 1,
+          "speed" => 3.14
+        })
 
       assert event.npc_id == 42
       assert event.player_lane == 1

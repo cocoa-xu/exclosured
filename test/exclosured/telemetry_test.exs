@@ -36,7 +36,8 @@ defmodule Exclosured.TelemetryTest do
     test "compile_start emits event with module name" do
       Telemetry.compile_start(:my_mod)
 
-      assert_receive {:telemetry, [:exclosured, :compile, :start], %{system_time: _}, %{module: :my_mod}}
+      assert_receive {:telemetry, [:exclosured, :compile, :start], %{system_time: _},
+                      %{module: :my_mod}}
     end
 
     test "compile_stop emits event with duration and wasm_size" do
@@ -44,7 +45,7 @@ defmodule Exclosured.TelemetryTest do
       Telemetry.compile_stop(:my_mod, start_time, wasm_size: 1024)
 
       assert_receive {:telemetry, [:exclosured, :compile, :stop], %{duration: duration},
-                       %{module: :my_mod, wasm_size: 1024}}
+                      %{module: :my_mod, wasm_size: 1024}}
 
       assert is_integer(duration)
       assert duration >= 0
@@ -55,7 +56,7 @@ defmodule Exclosured.TelemetryTest do
       Telemetry.compile_error(:my_mod, start_time, "cargo failed")
 
       assert_receive {:telemetry, [:exclosured, :compile, :error], %{duration: _},
-                       %{module: :my_mod, error: "cargo failed"}}
+                      %{module: :my_mod, error: "cargo failed"}}
     end
   end
 
@@ -64,28 +65,28 @@ defmodule Exclosured.TelemetryTest do
       Telemetry.wasm_call(:my_mod, "process")
 
       assert_receive {:telemetry, [:exclosured, :wasm, :call], %{},
-                       %{module: :my_mod, func: "process"}}
+                      %{module: :my_mod, func: "process"}}
     end
 
     test "wasm_result emits event" do
       Telemetry.wasm_result(:my_mod, "process")
 
       assert_receive {:telemetry, [:exclosured, :wasm, :result], %{},
-                       %{module: :my_mod, func: "process"}}
+                      %{module: :my_mod, func: "process"}}
     end
 
     test "wasm_emit emits event" do
       Telemetry.wasm_emit(:my_mod, "progress")
 
       assert_receive {:telemetry, [:exclosured, :wasm, :emit], %{},
-                       %{module: :my_mod, event: "progress"}}
+                      %{module: :my_mod, event: "progress"}}
     end
 
     test "wasm_error emits event" do
       Telemetry.wasm_error(:my_mod, "process", "function not found")
 
       assert_receive {:telemetry, [:exclosured, :wasm, :error], %{},
-                       %{module: :my_mod, func: "process", error: "function not found"}}
+                      %{module: :my_mod, func: "process", error: "function not found"}}
     end
 
     test "wasm_ready emits event" do

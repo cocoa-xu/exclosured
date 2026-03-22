@@ -139,7 +139,12 @@ defmodule Exclosured.Events do
   defp rust_type_to_typespec("bool"), do: quote(do: boolean())
   defp rust_type_to_typespec("String"), do: quote(do: String.t())
   defp rust_type_to_typespec("&str"), do: quote(do: String.t())
-  defp rust_type_to_typespec("Vec<" <> rest), do: quote(do: list(unquote(rust_type_to_typespec(String.trim_trailing(rest, ">")))))
-  defp rust_type_to_typespec("Option<" <> rest), do: quote(do: unquote(rust_type_to_typespec(String.trim_trailing(rest, ">"))) | nil)
+
+  defp rust_type_to_typespec("Vec<" <> rest),
+    do: quote(do: list(unquote(rust_type_to_typespec(String.trim_trailing(rest, ">")))))
+
+  defp rust_type_to_typespec("Option<" <> rest),
+    do: quote(do: unquote(rust_type_to_typespec(String.trim_trailing(rest, ">"))) | nil)
+
   defp rust_type_to_typespec(_), do: quote(do: any())
 end

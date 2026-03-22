@@ -281,7 +281,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       _ -> socket
     end
 
-    defp handle_wasm_event("wasm:result", %{"module" => module, "func" => func, "result" => result}, socket) do
+    defp handle_wasm_event(
+           "wasm:result",
+           %{"module" => module, "func" => func, "result" => result},
+           socket
+         ) do
       with {:ok, mod_atom} <- safe_atom(module) do
         Exclosured.Telemetry.wasm_result(mod_atom, func)
         send(self(), {:wasm_result, mod_atom, func, result})
@@ -290,7 +294,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       {:halt, socket}
     end
 
-    defp handle_wasm_event("wasm:emit", %{"module" => module, "event" => event, "payload" => payload}, socket) do
+    defp handle_wasm_event(
+           "wasm:emit",
+           %{"module" => module, "event" => event, "payload" => payload},
+           socket
+         ) do
       with {:ok, mod_atom} <- safe_atom(module) do
         Exclosured.Telemetry.wasm_emit(mod_atom, event)
         send(self(), {:wasm_emit, mod_atom, event, payload})
@@ -299,7 +307,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       {:halt, socket}
     end
 
-    defp handle_wasm_event("wasm:error", %{"module" => module, "func" => func, "error" => error}, socket) do
+    defp handle_wasm_event(
+           "wasm:error",
+           %{"module" => module, "func" => func, "error" => error},
+           socket
+         ) do
       with {:ok, mod_atom} <- safe_atom(module) do
         Exclosured.Telemetry.wasm_error(mod_atom, func, error)
         send(self(), {:wasm_error, mod_atom, func, error})
@@ -315,7 +327,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
         # Track readiness so call/5 can route to fallback when WASM isn't loaded
         ready = Map.get(socket.private, :exclosured_ready, MapSet.new())
-        socket = put_in(socket, [Access.key(:private), :exclosured_ready], MapSet.put(ready, mod_atom))
+
+        socket =
+          put_in(socket, [Access.key(:private), :exclosured_ready], MapSet.put(ready, mod_atom))
+
         {:halt, socket}
       else
         _ -> {:halt, socket}

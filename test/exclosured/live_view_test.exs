@@ -119,9 +119,7 @@ defmodule Exclosured.LiveViewTest do
       socket = build_socket()
 
       _socket =
-        Exclosured.LiveView.call(socket, :my_mod, "process", [42],
-          fallback: fn [n] -> n * 2 end
-        )
+        Exclosured.LiveView.call(socket, :my_mod, "process", [42], fallback: fn [n] -> n * 2 end)
 
       assert_receive {:wasm_result, :my_mod, "process", 84}
     end
