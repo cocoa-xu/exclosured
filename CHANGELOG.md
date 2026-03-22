@@ -41,6 +41,13 @@ Initial release of the Exclosured library.
 - Added: documentation comment about shared `window.__exclosured` limitation on multi-module pages
 - Changed: `loader.mjs` exports `WasmBuffer` alongside `ExclosuredLoader`
 
+## 0.1.2
+
+### npm (exclosured@0.1.2)
+
+- Fixed: added `/* @vite-ignore */` to the dynamic `import()` in ExclosuredHook, preventing Vite's `import-analysis` plugin from erroring on `/wasm/` paths during development
+- Same fix applied to `priv/static/exclosured_hook.js`
+
 ## 0.1.0
 
 ### npm (exclosured@0.1.0)

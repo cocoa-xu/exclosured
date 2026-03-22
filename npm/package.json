@@ -1,6 +1,6 @@
 {
   "name": "exclosured",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Phoenix LiveView hook for Exclosured WASM modules",
   "main": "index.js",
   "module": "index.mjs",

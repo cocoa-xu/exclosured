@@ -56,7 +56,7 @@ const ExclosuredHook = {
       // Import the wasm-bindgen JS glue and initialize the WASM module
       const jsUrl = `/wasm/${name}/${name}.js`;
       const wasmUrl = `/wasm/${name}/${name}_bg.wasm`;
-      const mod = await import(jsUrl);
+      const mod = await import(/* @vite-ignore */ jsUrl);
       await mod.default(wasmUrl);
       this.wasmBindgen = mod;
 
