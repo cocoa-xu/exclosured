@@ -96,23 +96,27 @@ defmodule Exclosured.Inline do
     # Compile at build time
     compile_inline_module(module_name, functions, output_dir)
 
-    # Generate Elixir bindings
+    # Generate Elixir bindings (only when LiveView is available)
     fn_defs =
-      for {name, args, _ret, _rust, _deps} <- functions do
-        arg_names = Keyword.keys(args)
-        arg_vars = Enum.map(arg_names, &Macro.var(&1, nil))
+      if Code.ensure_loaded?(Exclosured.LiveView) do
+        for {name, args, _ret, _rust, _deps} <- functions do
+          arg_names = Keyword.keys(args)
+          arg_vars = Enum.map(arg_names, &Macro.var(&1, nil))
 
-        quote do
-          @doc "Call `#{unquote(name)}` on the client's WASM instance via LiveView."
-          def unquote(name)(socket, unquote_splicing(arg_vars)) do
-            Exclosured.LiveView.call(
-              socket,
-              unquote(String.to_atom(module_name)),
-              unquote(to_string(name)),
-              [unquote_splicing(arg_vars)]
-            )
+          quote do
+            @doc "Call `#{unquote(name)}` on the client's WASM instance via LiveView."
+            def unquote(name)(socket, unquote_splicing(arg_vars)) do
+              Exclosured.LiveView.call(
+                socket,
+                unquote(String.to_atom(module_name)),
+                unquote(to_string(name)),
+                [unquote_splicing(arg_vars)]
+              )
+            end
           end
         end
+      else
+        []
       end
 
     meta =
@@ -124,7 +128,7 @@ defmodule Exclosured.Inline do
         def wasm_js_url, do: unquote("/wasm/#{module_name}/#{module_name}.js")
 
         @doc "Filesystem path to the compiled .wasm file."
-        def wasm_path, do: unquote("#{output_dir}/#{module_name}/#{module_name}_bg.wasm")
+        def wasm_path, do: unquote(Path.expand("#{output_dir}/#{module_name}/#{module_name}_bg.wasm"))
 
         @doc "Module name used for the .wasm file."
         def wasm_module_name, do: unquote(module_name)
@@ -155,11 +159,25 @@ defmodule Exclosured.Inline do
     extra_deps =
       functions
       |> Enum.flat_map(fn {_, _, _, _, deps} -> deps end)
-      |> Enum.uniq_by(fn {name, _} -> name end)
+      |> Enum.uniq_by(fn
+        {name, _} -> name
+        {name, _, _} -> name
+      end)
 
     extra_deps_toml =
-      Enum.map_join(extra_deps, "\n", fn {name, version} ->
-        "#{name} = \"#{version}\""
+      Enum.map_join(extra_deps, "\n", fn
+        {name, version, opts} when is_list(opts) ->
+          features = Keyword.get(opts, :features, [])
+
+          if features == [] do
+            "#{name} = \"#{version}\""
+          else
+            feat = Enum.map_join(features, ", ", &"\"#{&1}\"")
+            "#{name} = { version = \"#{version}\", features = [#{feat}] }"
+          end
+
+        {name, version} ->
+          "#{name} = \"#{version}\""
       end)
 
     # Write Cargo.toml
@@ -259,6 +277,7 @@ defmodule Exclosured.Inline do
 
         """
         #[no_mangle]
+        #[allow(unreachable_code)]
         pub extern "C" fn #{name}(#{params}) -> i32 {
         #{setup}
         #{indent(rust_code, 4)}

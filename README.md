@@ -280,7 +280,7 @@ MyApp.Crypto.wasm_exports() #=> [:hash_password]
 
 ### External Crates via `deps:`
 
-Add crate dependencies that compile to wasm32. Pure-Rust crates generally work; crates with C/system dependencies do not. [Maud](https://maud.lambda.xyz/) validates HTML at compile time, [serde](https://serde.rs/) handles serialization, [aes-gcm](https://github.com/RustCrypto/AEADs) does encryption:
+Add crate dependencies that compile to wasm32. Pure-Rust crates generally work; crates with C/system dependencies do not. Enable Cargo features with a keyword list:
 
 ```elixir
 defwasm :render_card, args: [data: :binary], deps: [maud: "0.26"] do
@@ -300,6 +300,23 @@ defwasm :render_card, args: [data: :binary], deps: [maud: "0.26"] do
   let bytes = markup.into_string().into_bytes();
   data[..bytes.len()].copy_from_slice(&bytes);
   return bytes.len() as i32;
+  """
+end
+```
+
+To enable crate features (e.g. serde's `derive`), pass a keyword list as the third element:
+
+```elixir
+defwasm :parse, args: [data: :binary],
+  deps: [{"serde", "1", features: ["derive"]}, {"serde_json", "1"}] do
+  ~S"""
+  #[derive(serde::Deserialize)]
+  struct Input { name: String, value: f64 }
+
+  let input: Input = serde_json::from_str(
+      core::str::from_utf8(data).unwrap_or("{}")
+  ).unwrap();
+  // ...
   """
 end
 ```

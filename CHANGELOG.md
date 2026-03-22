@@ -10,6 +10,18 @@ This project publishes to three registries. Version bumps are kept in sync.
 | [npmjs.com](https://www.npmjs.com/package/exclosured) | `exclosured` (JS LiveView hook) |
 | [crates.io](https://crates.io/crates/exclosured_guest) | `exclosured_guest` (Rust guest crate) |
 
+## Unreleased
+
+### hex.pm (exclosured)
+
+- Added: `deps:` in `defwasm` now supports keyword options for Cargo features:
+  `{"serde", "1", features: ["derive"]}` generates
+  `serde = { version = "1", features = ["derive"] }` in Cargo.toml
+- Added: `#[allow(unreachable_code)]` to generated Rust functions, suppressing
+  warnings when user code has an explicit `return`
+- Changed: LiveView wrapper functions in `defwasm` are only generated when
+  `Exclosured.LiveView` is available (fixes compile warnings in non-Phoenix projects)
+
 ## 0.1.0
 
 ### hex.pm
