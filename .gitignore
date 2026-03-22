@@ -25,7 +25,8 @@ exclosured-*.tar
 # WASM build artifacts
 /priv/static/wasm/
 
-# Cargo build artifacts in consumer projects
+# Cargo build artifacts
 native/wasm/target/
+native/exclosured_guest/target/
 
 .DS_Store

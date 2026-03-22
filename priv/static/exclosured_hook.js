@@ -23,6 +23,16 @@ const ExclosuredHook = {
     try {
       // Set up the global namespace that wasm-bindgen imported functions
       // will call into (emit_event, broadcast_event).
+      //
+      // LIMITATION: wasm-bindgen's js_namespace imports resolve
+      // `window.__exclosured` at call time, not at init time. When
+      // multiple WASM modules are loaded on the same page, the last
+      // mounted hook overwrites this global. All modules will then
+      // route their emit/broadcast calls through that hook's pushEvent.
+      // The `module` field in the payload is still set correctly per
+      // hook, and for single-LiveView pages this is harmless. For
+      // multi-LiveView pages, consider using a single WASM crate
+      // (Cargo workspace) that bundles all functions.
       window.__exclosured = {
         emit_event: (event, payload) => {
           try {
@@ -72,9 +82,9 @@ const ExclosuredHook = {
       // Handle RPC calls from LiveView
       this.handleEvent("wasm:call", ({ func, args, ref }) => {
         try {
-          const fn = this.wasmBindgen[func];
-          if (!fn) throw new Error(`Function '${func}' not exported`);
-          const result = fn(...args);
+          const wasmFn = this.wasmBindgen[func];
+          if (!wasmFn) throw new Error(`Function '${func}' not exported`);
+          const result = wasmFn(...args);
           this.pushEvent("wasm:result", {
             ref: ref,
             module: name,
@@ -159,12 +169,23 @@ const ExclosuredHook = {
   },
 
   destroyed() {
-    // Clean up subscriptions
+    // Clean up inter-module broadcast subscriptions
     this._subscriptions.forEach(({ channel, handler }) => {
       window.__exclosured_bus.removeEventListener(channel, handler);
     });
     this._subscriptions = [];
 
+    // Call the WASM module's cleanup function if it exports one
+    if (this.wasmBindgen && typeof this.wasmBindgen.destroyed === "function") {
+      try {
+        this.wasmBindgen.destroyed();
+      } catch (e) {
+        console.error("Exclosured: error in WASM destroyed() callback", e);
+      }
+    }
+
+    // Note: handleEvent listeners registered via this.handleEvent() are
+    // automatically cleaned up by Phoenix when the hook is destroyed.
     this.wasmBindgen = null;
   },
 };

@@ -31,6 +31,16 @@ defmodule ExclosuredTest do
       assert Exclosured.asset_url(:ai_engine, "model.onnx") ==
                "/wasm/assets/ai_engine/model.onnx"
     end
+
+    test "strips directory components from filename" do
+      assert Exclosured.asset_url(:ai_engine, "../../../etc/passwd") ==
+               "/wasm/assets/ai_engine/passwd"
+    end
+
+    test "handles nested path traversal" do
+      assert Exclosured.asset_url(:mod, "foo/bar/../../secret.txt") ==
+               "/wasm/assets/mod/secret.txt"
+    end
   end
 
   describe "modules/0" do
