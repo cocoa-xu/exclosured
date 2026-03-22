@@ -9,7 +9,7 @@ defmodule LiveVueWasmWeb.Stats do
   use Exclosured.Inline
 
   defwasm :compute_stats, args: [data: :binary] do
-    ~S"""
+    ~RUST"""
     // Parse the data buffer as UTF-8
     let input = match core::str::from_utf8(data) {
         Ok(s) => s,

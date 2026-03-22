@@ -3,7 +3,7 @@ defmodule ConfidentialComputeWeb.Validators do
 
   @doc "Password strength scoring. Runs entirely in the browser."
   defwasm :check_password, args: [input: :binary] do
-    ~S"""
+    ~RUST"""
     let s = match core::str::from_utf8(input) {
         Ok(v) => v,
         Err(_) => return -1,
@@ -100,7 +100,7 @@ defmodule ConfidentialComputeWeb.Validators do
 
   @doc "SSN validation and masking. Only the masked value leaves the browser."
   defwasm :mask_ssn, args: [input: :binary] do
-    ~S"""
+    ~RUST"""
     let s = match core::str::from_utf8(input) {
         Ok(v) => v,
         Err(_) => return -1,

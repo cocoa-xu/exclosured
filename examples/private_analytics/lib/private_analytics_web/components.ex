@@ -16,7 +16,7 @@ defmodule PrivateAnalyticsWeb.Components do
   Output: Safe, escaped HTML string written back into the input buffer.
   """
   defwasm :render_stats_card, args: [data: :binary], deps: [maud: "0.26"] do
-    ~S"""
+    ~RUST"""
     use maud::html;
 
     fn find_value<'a>(json: &'a str, key: &str) -> Option<&'a str> {

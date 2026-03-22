@@ -10,7 +10,7 @@ defmodule LiveSvelteWasmWeb.Markdown do
   use Exclosured.Inline
 
   defwasm :parse_markdown, args: [input: :binary], deps: ["pulldown-cmark": "0.12"] do
-    ~S"""
+    ~RUST"""
     use pulldown_cmark::{Parser, Options, html::push_html};
 
     // The buffer may be larger than the actual markdown content.

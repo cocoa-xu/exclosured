@@ -19,7 +19,7 @@ defmodule KinoExclosured.Stats do
   defwasm :compute_stats,
     args: [data: :binary],
     deps: [{"serde", "1", features: ["derive"]}, {"serde_json", "1"}] do
-    ~S"""
+    ~RUST"""
     // Parse JSON array of numbers from the input buffer
     let input_str = core::str::from_utf8(data).unwrap_or("[]");
     let values: Vec<f64> = serde_json::from_str(input_str).unwrap_or_default();
@@ -70,7 +70,7 @@ defmodule KinoExclosured.Stats do
   defwasm :compute_histogram,
     args: [data: :binary],
     deps: [{"serde", "1", features: ["derive"]}, {"serde_json", "1"}] do
-    ~S"""
+    ~RUST"""
     // Parse JSON: {"values": [...], "bins": 20}
     #[derive(serde::Deserialize)]
     struct HistInput { values: Vec<f64>, bins: usize }
