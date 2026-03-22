@@ -31,8 +31,14 @@ jobs:
         with:
           targets: wasm32-unknown-unknown
 
+      - name: Cache Cargo bin
+        uses: actions/cache@v5
+        with:
+          path: ~/.cargo/bin
+          key: cargo-bin-${{ runner.os }}-wasm-bindgen
+
       - name: Install wasm-bindgen-cli
-        run: cargo install wasm-bindgen-cli
+        run: command -v wasm-bindgen || cargo install wasm-bindgen-cli
 
       - name: Cache Elixir deps
         uses: actions/cache@v5
@@ -40,7 +46,8 @@ jobs:
           path: |
             deps
             _build
-          key: elixir-${{ runner.os }}-${{ env.ELIXIR_VERSION }}-${{ env.OTP_VERSION }}-${{ hashFiles('mix.lock') }}
+            priv/static/wasm
+          key: elixir-${{ runner.os }}-${{ env.ELIXIR_VERSION }}-${{ env.OTP_VERSION }}-${{ hashFiles('mix.lock') }}-${{ hashFiles('test/**/*.exs') }}
           restore-keys: |
             elixir-${{ runner.os }}-${{ env.ELIXIR_VERSION }}-${{ env.OTP_VERSION }}-
 
