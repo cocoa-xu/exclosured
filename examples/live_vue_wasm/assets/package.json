@@ -1,0 +1,19 @@
+{
+  "type": "module",
+  "dependencies": {
+    "phoenix": "file:../deps/phoenix",
+    "phoenix_html": "file:../deps/phoenix_html",
+    "phoenix_live_view": "file:../deps/phoenix_live_view",
+    "live_vue": "file:../deps/live_vue",
+    "exclosured": "file:../../../npm"
+  },
+  "devDependencies": {
+    "vite": "^5.0",
+    "@vitejs/plugin-vue": "^5.0",
+    "vue": "^3.4"
+  },
+  "scripts": {
+    "dev": "vite dev",
+    "build": "vite build"
+  }
+}

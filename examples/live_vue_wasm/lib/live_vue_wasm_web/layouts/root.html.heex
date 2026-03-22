@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="csrf-token" content={Phoenix.Controller.get_csrf_token()} />
+    <title>Real-time Statistics Dashboard</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body {
+        font-family: system-ui, -apple-system, sans-serif;
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 2rem;
+        background: #0f0f1a;
+        color: #e0e0e0;
+      }
+      h1 {
+        margin-bottom: 0.25rem;
+        color: #66d9ef;
+        font-size: 1.8rem;
+      }
+      .subtitle {
+        color: #888;
+        margin-bottom: 1.5rem;
+        font-size: 0.95rem;
+      }
+
+      /* Stats Dashboard Styles */
+      .stats-dashboard {
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+      }
+      .chart-area {
+        background: #1a1a2e;
+        border-radius: 12px;
+        padding: 1.25rem;
+        border: 1px solid #2a2a40;
+      }
+      .chart-area canvas {
+        display: block;
+        width: 100%;
+        height: 220px;
+      }
+      .chart-title {
+        font-size: 0.85rem;
+        color: #888;
+        margin-bottom: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+      .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 0.75rem;
+      }
+      .stat-card {
+        background: #1a1a2e;
+        border-radius: 10px;
+        padding: 1rem;
+        border: 1px solid #2a2a40;
+        text-align: center;
+        transition: border-color 0.2s;
+      }
+      .stat-card:hover {
+        border-color: #3a3a55;
+      }
+      .stat-label {
+        display: block;
+        font-size: 0.7rem;
+        color: #666;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        margin-bottom: 0.35rem;
+      }
+      .stat-value {
+        display: block;
+        font-size: 1.35rem;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+      }
+      .stat-value.count { color: #66d9ef; }
+      .stat-value.mean { color: #a6e22e; }
+      .stat-value.min-val { color: #fd971f; }
+      .stat-value.max-val { color: #f92672; }
+      .stat-value.stddev { color: #ae81ff; }
+      .stat-value.p50 { color: #e6db74; }
+      .stat-value.p90 { color: #66d9ef; }
+      .stat-value.p99 { color: #f92672; }
+
+      .controls {
+        display: flex;
+        gap: 1rem;
+        align-items: center;
+        margin-bottom: 1.5rem;
+        flex-wrap: wrap;
+      }
+      button {
+        padding: 0.6rem 1.5rem;
+        border: none;
+        border-radius: 8px;
+        font-size: 0.9rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: opacity 0.2s;
+      }
+      button:hover { opacity: 0.85; }
+      button:disabled { opacity: 0.4; cursor: not-allowed; }
+      .btn-start { background: #a6e22e; color: #1a1a2e; }
+      .btn-stop { background: #f92672; color: white; }
+      .btn-reset { background: #3a3a55; color: #ccc; }
+      .status-badge {
+        padding: 0.4rem 0.8rem;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 600;
+      }
+      .status-badge.running {
+        background: rgba(166, 226, 46, 0.15);
+        color: #a6e22e;
+      }
+      .status-badge.stopped {
+        background: rgba(249, 38, 114, 0.15);
+        color: #f92672;
+      }
+      .status-badge.loading {
+        background: rgba(102, 217, 239, 0.15);
+        color: #66d9ef;
+      }
+      .wasm-info {
+        margin-top: 1rem;
+        padding: 0.75rem 1rem;
+        background: rgba(166, 226, 46, 0.08);
+        border: 1px solid rgba(166, 226, 46, 0.2);
+        border-radius: 8px;
+        font-size: 0.8rem;
+        color: #888;
+      }
+      .wasm-info strong { color: #a6e22e; }
+
+      @media (max-width: 640px) {
+        .stats-grid { grid-template-columns: repeat(2, 1fr); }
+        .controls { flex-direction: column; align-items: stretch; }
+      }
+    </style>
+  </head>
+  <body>
+    <%= @inner_content %>
+    <LiveVue.Reload.vite_assets assets={~w(/js/app.js)}>
+      <script type="module" phx-track-static crossorigin="anonymous" src="/assets/app.js">
+      </script>
+    </LiveVue.Reload.vite_assets>
+  </body>
+</html>
