@@ -18,7 +18,7 @@ This changes three things:
 
 ## Key Features
 
-**Write Rust inline in Elixir** with `defwasm`. No Cargo workspace, no `.rs` files. Pull in any crate from crates.io via `deps:`:
+**Write Rust inline in Elixir** with `defwasm`. No Cargo workspace, no `.rs` files. Add pure-Rust crate dependencies via `deps:`:
 
 ```elixir
 defmodule MyApp.Renderer do
@@ -210,6 +210,150 @@ Exclosured.LiveView.stream_call(socket, :mod, "func", [args],
 // Rust guest crate
 exclosured::emit("event_name", r#"{"key": "value"}"#);  // send to LiveView
 exclosured::broadcast("channel", &payload);               // send to other WASM modules
+```
+
+## Code Examples
+
+### Inline WASM with `defwasm`
+
+Define a Rust function directly in Elixir. No Cargo workspace, no `.rs` files:
+
+```elixir
+defmodule MyApp.Crypto do
+  use Exclosured.Inline
+
+  defwasm :hash_password, args: [password: :binary] do
+    """
+    let mut hash: u32 = 5381;
+    for &byte in password.iter() {
+        hash = hash.wrapping_mul(33).wrapping_add(byte as u32);
+    }
+    """
+  end
+end
+
+# After mix compile:
+MyApp.Crypto.wasm_url()     #=> "/wasm/my_app_crypto/my_app_crypto_bg.wasm"
+MyApp.Crypto.wasm_exports() #=> [:hash_password]
+```
+
+### External Crates via `deps:`
+
+Add crate dependencies that compile to wasm32. Pure-Rust crates generally work; crates with C/system dependencies do not. [Maud](https://maud.lambda.xyz/) validates HTML at compile time, [serde](https://serde.rs/) handles serialization, [aes-gcm](https://github.com/RustCrypto/AEADs) does encryption:
+
+```elixir
+defwasm :render_card, args: [data: :binary], deps: [maud: "0.26"] do
+  ~S"""
+  use maud::html;
+
+  let markup = html! {
+      div class="card" {
+          h3 { (title) }
+          ul {
+              @for item in &items {
+                  li { (item) }
+              }
+          }
+      }
+  };
+  let bytes = markup.into_string().into_bytes();
+  data[..bytes.len()].copy_from_slice(&bytes);
+  return bytes.len() as i32;
+  """
+end
+```
+
+### Full Cargo Workspace
+
+For larger modules with persistent state, browser APIs, and multiple files:
+
+```rust
+// native/wasm/my_module/src/lib.rs
+use wasm_bindgen::prelude::*;
+use exclosured_guest as exclosured;
+
+#[wasm_bindgen]
+pub fn process(input: &str) -> i32 {
+    let result = input.split_whitespace().count();
+    exclosured::emit("progress", r#"{"percent": 100}"#);
+    result as i32
+}
+```
+
+```elixir
+# In your LiveView
+def handle_event("analyze", %{"text" => text}, socket) do
+  socket = Exclosured.LiveView.call(socket, :my_module, "process", [text])
+  {:noreply, socket}
+end
+
+def handle_info({:wasm_result, :my_module, "process", count}, socket) do
+  {:noreply, assign(socket, word_count: count)}
+end
+```
+
+### LiveView Hook in Rust
+
+Write DOM-interacting hooks entirely in Rust, with JS as a thin shim:
+
+```rust
+#[wasm_bindgen]
+pub struct SqlEditorHook {
+    container: HtmlElement,
+    push_event: js_sys::Function,
+}
+
+#[wasm_bindgen]
+impl SqlEditorHook {
+    #[wasm_bindgen(constructor)]
+    pub fn new(container: HtmlElement, push_event: js_sys::Function) -> Self { ... }
+
+    pub fn mounted(&mut self) {
+        // Set up textarea, syntax highlighting overlay, keyboard shortcuts
+        // All via web-sys. No JS needed.
+    }
+
+    pub fn on_event(&self, event: &str, payload: &str) {
+        // Handle events from the server (e.g., sync SQL from another editor)
+    }
+}
+```
+
+```javascript
+// The entire JS hook (10 lines):
+const mod = await import("/wasm/my_hook/my_hook.js");
+await mod.default("/wasm/my_hook/my_hook_bg.wasm");
+const pushFn = (event, payload) => this.pushEvent(event, JSON.parse(payload));
+this._hook = new mod.SqlEditorHook(this.el, pushFn);
+this._hook.mounted();
+this.handleEvent("sync_sql", (d) => this._hook.on_event("set_sql", d.sql));
+```
+
+### Typed Events from Rust Structs
+
+Annotate Rust structs, get Elixir structs at compile time:
+
+```rust
+/// exclosured:event
+pub struct StageComplete {
+    pub stage_name: String,
+    pub items_processed: u32,
+    pub duration_ms: u32,
+}
+```
+
+```elixir
+defmodule MyApp.Events do
+  use Exclosured.Events, source: "native/wasm/pipeline/src/lib.rs"
+end
+
+# Pattern match on typed structs instead of raw maps:
+def handle_info({:wasm_emit, :pipeline, "stage_complete", payload}, socket) do
+  event = MyApp.Events.StageComplete.from_payload(payload)
+  # event.stage_name    => "validate"
+  # event.items_processed => 500
+  # event.duration_ms   => 42
+end
 ```
 
 ## Compared to Other Libraries
