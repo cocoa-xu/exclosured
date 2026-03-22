@@ -19,8 +19,14 @@ This project publishes to three registries. Version bumps are kept in sync.
   `serde = { version = "1", features = ["derive"] }` in Cargo.toml
 - Added: `#[allow(unreachable_code)]` to generated Rust functions, suppressing
   warnings when user code has an explicit `return`
+- Added: `~RUST` sigil for inline Rust code in `defwasm`. Behaves like `~S`
+  (no interpolation) but enables editor extensions to provide Rust syntax
+  highlighting and LSP support inside Elixir files
+- Added: `defwasm` one-liner syntax:
+  `defwasm :add, args: [a: :i32, b: :i32], do: "return a + b;"`
 - Changed: LiveView wrapper functions in `defwasm` are only generated when
   `Exclosured.LiveView` is available (fixes compile warnings in non-Phoenix projects)
+- Changed: `wasm_path/0` now returns an absolute path (works correctly in Livebook/Mix.install)
 
 ## 0.1.0
 

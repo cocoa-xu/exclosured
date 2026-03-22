@@ -8,11 +8,16 @@ defmodule Exclosured.Inline do
 
   ## Example
 
+      defmodule MyApp.Math do
+        use Exclosured.Inline
+        defwasm :add, args: [a: :i32, b: :i32], do: ~RUST"return a + b;"
+      end
+
       defmodule MyApp.Filters do
         use Exclosured.Inline
 
         defwasm :grayscale, args: [pixels: :binary] do
-          \"\"\"
+          ~RUST\"\"\"
           for chunk in pixels.chunks_exact_mut(4) {
               let gray = (0.299 * chunk[0] as f32
                         + 0.587 * chunk[1] as f32
@@ -24,6 +29,8 @@ defmodule Exclosured.Inline do
           \"\"\"
         end
       end
+
+  Use `~RUST` instead of `~S` to enable Rust syntax highlighting in editors.
 
   After `mix compile`:
     - `priv/static/wasm/my_app_filters/my_app_filters_bg.wasm` is generated
@@ -40,10 +47,35 @@ defmodule Exclosured.Inline do
 
   defmacro __using__(_opts) do
     quote do
-      import Exclosured.Inline, only: [defwasm: 3]
+      import Exclosured.Inline, only: [defwasm: 2, defwasm: 3, sigil_RUST: 2]
       Module.register_attribute(__MODULE__, :__wasm_fns, accumulate: true)
       @before_compile Exclosured.Inline
     end
+  end
+
+  @doc ~S"""
+  A sigil for inline Rust code. Works like `~S` (no interpolation),
+  but signals to editor extensions that the content is Rust source.
+
+  ## Example
+
+      defwasm :add, args: [a: :i32, b: :i32] do
+        ~RUST"return a + b;"
+      end
+
+      defwasm :hash, args: [data: :binary] do
+        ~RUST\"\"\"
+        let mut hash: u32 = 5381;
+        for &byte in data.iter() {
+            hash = hash.wrapping_mul(33).wrapping_add(byte as u32);
+        }
+        return hash as i32;
+        \"\"\"
+      end
+  """
+  defmacro sigil_RUST(term, _modifiers) do
+    # Return the raw string, same as ~S
+    term
   end
 
   @doc """
@@ -61,6 +93,13 @@ defmodule Exclosured.Inline do
       (default: `[]`). These are added to the generated `Cargo.toml`.
       Example: `deps: [{"serde", "1"}, {"serde_json", "1"}]`
   """
+  # One-liner: defwasm :name, args: [...], do: "code"
+  defmacro defwasm(name, opts) when is_list(opts) do
+    {body, opts} = Keyword.pop!(opts, :do)
+    rust_code = extract_rust_code(body)
+    do_defwasm(name, opts, rust_code)
+  end
+
   defmacro defwasm(name, opts, do: {:__block__, _, [rust_code]})
            when is_binary(rust_code) do
     do_defwasm(name, opts, rust_code)
@@ -75,6 +114,17 @@ defmodule Exclosured.Inline do
            when is_binary(rust_code) do
     do_defwasm(name, opts, rust_code)
   end
+
+  # Support ~RUST sigil (editor-friendly, enables syntax highlighting)
+  defmacro defwasm(name, opts, do: {:sigil_RUST, _, [{:<<>>, _, [rust_code]}, _]})
+           when is_binary(rust_code) do
+    do_defwasm(name, opts, rust_code)
+  end
+
+  defp extract_rust_code(code) when is_binary(code), do: code
+  defp extract_rust_code({:__block__, _, [code]}) when is_binary(code), do: code
+  defp extract_rust_code({:sigil_S, _, [{:<<>>, _, [code]}, _]}) when is_binary(code), do: code
+  defp extract_rust_code({:sigil_RUST, _, [{:<<>>, _, [code]}, _]}) when is_binary(code), do: code
 
   defp do_defwasm(name, opts, rust_code) do
     quote do
@@ -93,8 +143,8 @@ defmodule Exclosured.Inline do
     module_name = wasm_module_name(env.module)
     output_dir = Application.get_env(:exclosured, :output_dir, "priv/static/wasm")
 
-    # Compile at build time
-    compile_inline_module(module_name, functions, output_dir)
+    # Compile at build time, get the absolute output directory
+    abs_output_dir = compile_inline_module(module_name, functions, output_dir)
 
     # Generate Elixir bindings (only when LiveView is available)
     fn_defs =
@@ -128,7 +178,7 @@ defmodule Exclosured.Inline do
         def wasm_js_url, do: unquote("/wasm/#{module_name}/#{module_name}.js")
 
         @doc "Filesystem path to the compiled .wasm file."
-        def wasm_path, do: unquote(Path.expand("#{output_dir}/#{module_name}/#{module_name}_bg.wasm"))
+        def wasm_path, do: unquote(Path.join(abs_output_dir, "#{module_name}_bg.wasm"))
 
         @doc "Module name used for the .wasm file."
         def wasm_module_name, do: unquote(module_name)
@@ -235,7 +285,7 @@ defmodule Exclosured.Inline do
           wasm_src =
             Path.join([target_dir, "wasm32-unknown-unknown", "release", "#{module_name}.wasm"])
 
-          out_dir = Path.join(output_dir, module_name)
+          out_dir = Path.expand(Path.join(output_dir, module_name))
           File.mkdir_p!(out_dir)
 
           # Run wasm-bindgen on the output
@@ -267,6 +317,9 @@ defmodule Exclosured.Inline do
           Mix.raise("Failed to compile inline WASM module #{module_name} (exit code: #{code})")
       end
     end
+
+    # Return the absolute output directory (used by wasm_path/0)
+    Path.expand(Path.join(output_dir, module_name))
   end
 
   defp generate_lib_rs(functions) do

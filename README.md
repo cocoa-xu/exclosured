@@ -25,14 +25,23 @@ This changes three things:
 
 ## Key Features
 
-**Write Rust inline in Elixir** with `defwasm`. No Cargo workspace, no `.rs` files. Add pure-Rust crate dependencies via `deps:`:
+**Write Rust inline in Elixir** with `defwasm`. No Cargo workspace, no `.rs` files. Simple functions fit on one line:
+
+```elixir
+defmodule MyApp.Math do
+  use Exclosured.Inline
+  defwasm :add, args: [a: :i32, b: :i32], do: "return a + b;"
+end
+```
+
+Add pure-Rust crate dependencies via `deps:`:
 
 ```elixir
 defmodule MyApp.Renderer do
   use Exclosured.Inline
 
   defwasm :render_card, args: [data: :binary], deps: [maud: "0.26"] do
-    ~S"""
+    ~RUST"""
     use maud::html;
     let markup = html! { div class="card" { h3 { (title) } } };
     let bytes = markup.into_string().into_bytes();
@@ -284,7 +293,7 @@ Add crate dependencies that compile to wasm32. Pure-Rust crates generally work; 
 
 ```elixir
 defwasm :render_card, args: [data: :binary], deps: [maud: "0.26"] do
-  ~S"""
+  ~RUST"""
   use maud::html;
 
   let markup = html! {
@@ -309,7 +318,7 @@ To enable crate features (e.g. serde's `derive`), pass a keyword list as the thi
 ```elixir
 defwasm :parse, args: [data: :binary],
   deps: [{"serde", "1", features: ["derive"]}, {"serde_json", "1"}] do
-  ~S"""
+  ~RUST"""
   #[derive(serde::Deserialize)]
   struct Input { name: String, value: f64 }
 
