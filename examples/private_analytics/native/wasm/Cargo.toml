@@ -1,0 +1,3 @@
+[workspace]
+members = ["private_analytics_wasm"]
+resolver = "2"

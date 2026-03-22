@@ -1,0 +1,7 @@
+/_build/
+/deps/
+priv/static/wasm/
+priv/static/assets/
+native/wasm/target/
+*.beam
+.elixir_ls/

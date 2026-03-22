@@ -364,13 +364,29 @@ Exclosured.modules()               #=> [:my_mod, :renderer]
 # LiveView: call a WASM function on the client
 Exclosured.LiveView.call(socket, :my_mod, "process", [input])
 
+# LiveView: call with server fallback (if WASM hasn't loaded yet)
+Exclosured.LiveView.call(socket, :my_mod, "process", [input],
+  fallback: fn [input] -> MyApp.process_on_server(input) end
+)
+# Result arrives via {:wasm_result, ...} either way. Your handle_info is identical.
+
 # LiveView: push state to a WASM module
 Exclosured.LiveView.push_state(socket, :renderer, %{speed: 50})
 
-# LiveView: HEEx component
+# LiveView: declarative state sync (auto-pushes when assigns change)
 ~H"""
-<Exclosured.LiveView.sandbox module={:my_mod} />
+<Exclosured.LiveView.sandbox
+  module={:renderer}
+  sync={Exclosured.LiveView.sync(assigns, ~w(speed color count)a)}
+  canvas
+/>
 """
+
+# LiveView: streaming results (accumulate incremental WASM output)
+Exclosured.LiveView.stream_call(socket, :processor, "analyze", [data],
+  on_chunk: fn chunk, socket -> update(socket, :results, &[chunk | &1]) end,
+  on_done: fn socket -> assign(socket, processing: false) end
+)
 ```
 
 ## Guest Crate

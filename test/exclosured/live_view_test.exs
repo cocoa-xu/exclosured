@@ -80,6 +80,53 @@ defmodule Exclosured.LiveViewTest do
     end
   end
 
+  describe "wasm_ready?/2" do
+    test "returns false when no modules are ready" do
+      socket = build_socket()
+      refute Exclosured.LiveView.wasm_ready?(socket, :my_mod)
+    end
+
+    test "returns true after module is marked ready" do
+      socket = build_socket()
+      ready = MapSet.new([:my_mod])
+      socket = put_in(socket, [Access.key(:private), :exclosured_ready], ready)
+      assert Exclosured.LiveView.wasm_ready?(socket, :my_mod)
+    end
+
+    test "returns false for a different module" do
+      socket = build_socket()
+      ready = MapSet.new([:other_mod])
+      socket = put_in(socket, [Access.key(:private), :exclosured_ready], ready)
+      refute Exclosured.LiveView.wasm_ready?(socket, :my_mod)
+    end
+  end
+
+  describe "call/5 with fallback" do
+    test "runs fallback when WASM is not ready" do
+      socket = build_socket()
+
+      # call with fallback, WASM not ready
+      _socket =
+        Exclosured.LiveView.call(socket, :my_mod, "count", ["hello world"],
+          fallback: fn [text] -> length(String.split(text)) end
+        )
+
+      # Fallback sends the result as if WASM returned it
+      assert_receive {:wasm_result, :my_mod, "count", 2}
+    end
+
+    test "fallback result matches WASM result shape" do
+      socket = build_socket()
+
+      _socket =
+        Exclosured.LiveView.call(socket, :my_mod, "process", [42],
+          fallback: fn [n] -> n * 2 end
+        )
+
+      assert_receive {:wasm_result, :my_mod, "process", 84}
+    end
+  end
+
   describe "stream_call/5" do
     test "requires :on_chunk option" do
       assert_raise KeyError, ~r/key :on_chunk not found/, fn ->

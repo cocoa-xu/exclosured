@@ -71,18 +71,63 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     @doc """
     Call a WASM function on the client. The result will arrive as a
     `{:wasm_result, module, func, result}` message via `handle_info/2`.
-    """
-    def call(socket, module, func, args, _opts \\ []) do
-      ref = System.unique_integer([:positive]) |> Integer.to_string()
-      Exclosured.Telemetry.wasm_call(module, func)
 
-      socket
-      |> ensure_wasm_hook()
-      |> push_event("wasm:call", %{
-        func: func,
-        args: args,
-        ref: ref
-      })
+    ## Options
+
+      * `:fallback` - a function that receives the args list and returns a result.
+        If WASM is not loaded yet, the fallback runs on the server and delivers
+        the result via `{:wasm_result, module, func, result}`, the same shape
+        as a WASM result. Your `handle_info` works identically either way.
+
+    ## Example
+
+        socket = Exclosured.LiveView.call(socket, :my_mod, "process", [text],
+          fallback: fn [text] -> String.split(text) |> length() end
+        )
+
+        # This handler works regardless of whether WASM or fallback ran:
+        def handle_info({:wasm_result, :my_mod, "process", result}, socket) do
+          {:noreply, assign(socket, result: result)}
+        end
+    """
+    def call(socket, module, func, args, opts \\ []) do
+      fallback = Keyword.get(opts, :fallback)
+      wasm_ready? = wasm_ready?(socket, module)
+
+      cond do
+        wasm_ready? ->
+          ref = System.unique_integer([:positive]) |> Integer.to_string()
+          Exclosured.Telemetry.wasm_call(module, func)
+
+          socket
+          |> ensure_wasm_hook()
+          |> push_event("wasm:call", %{func: func, args: args, ref: ref})
+
+        fallback != nil ->
+          result = fallback.(args)
+          Exclosured.Telemetry.wasm_call(module, func)
+          Exclosured.Telemetry.wasm_result(module, func)
+          send(self(), {:wasm_result, module, func, result})
+          socket
+
+        true ->
+          # No WASM, no fallback. Push the call anyway; it will execute when WASM loads.
+          ref = System.unique_integer([:positive]) |> Integer.to_string()
+          Exclosured.Telemetry.wasm_call(module, func)
+
+          socket
+          |> ensure_wasm_hook()
+          |> push_event("wasm:call", %{func: func, args: args, ref: ref})
+      end
+    end
+
+    @doc """
+    Check if a WASM module has reported ready for this socket.
+    """
+    def wasm_ready?(socket, module) do
+      socket.private
+      |> Map.get(:exclosured_ready, MapSet.new())
+      |> MapSet.member?(module)
     end
 
     @doc """
@@ -267,9 +312,14 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       with {:ok, mod_atom} <- safe_atom(module) do
         Exclosured.Telemetry.wasm_ready(mod_atom)
         send(self(), {:wasm_ready, mod_atom})
-      end
 
-      {:halt, socket}
+        # Track readiness so call/5 can route to fallback when WASM isn't loaded
+        ready = Map.get(socket.private, :exclosured_ready, MapSet.new())
+        socket = put_in(socket, [Access.key(:private), :exclosured_ready], MapSet.put(ready, mod_atom))
+        {:halt, socket}
+      else
+        _ -> {:halt, socket}
+      end
     end
 
     defp handle_wasm_event(_event, _params, socket) do
