@@ -1,0 +1,11 @@
+/_build/
+/cover/
+/deps/
+/doc/
+/tmp/
+erl_crash.dump
+*.ez
+priv/static/wasm/
+priv/static/assets/
+native/wasm/target/
+/assets/node_modules/
