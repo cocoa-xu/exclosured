@@ -2,575 +2,227 @@
 
 Compile Rust to WebAssembly, run it in your users' browsers, and talk to it from Phoenix LiveView.
 
-**Exclosured** lets you write performance-critical code in Rust, compile it to WASM at build time, and seamlessly integrate it with your Phoenix application. The WASM runs in an isolated sandbox on the client. Your server never touches the data.
-
 > *exclosure* (n.): an ecological term for a fenced area that excludes external interference. Your WASM code runs in a browser sandbox, isolated and secure.
 
-## Why?
+## What Makes Exclosured Different
 
-### Offload computation to the client
+Every other Elixir+Rust library ([Rustler](https://github.com/rusterlium/rustler), [Wasmex](https://github.com/tessi/wasmex), [Orb](https://github.com/RoyalIcing/Orb)) runs code on **your server**. Exclosured runs code in **the user's browser**.
 
-Your server has finite CPU. Your users' browsers are idle. Move the heavy work (image processing, text analysis, data transformation, AI inference) to WASM running at near-native speed on the client. Your server sends input, the browser crunches it, results come back. Same user experience, 10x more headroom on your server.
+This changes three things:
 
-### Keep sensitive data on the client
+**Cost.** The server does zero work for offloaded tasks. 1000 users = 1000 browsers doing their own compute. Your server scales by doing less.
 
-Some data shouldn't touch your server at all. Passwords, medical records, financial documents, biometric data. With Exclosured, you write the processing logic in Rust, compile it to WASM, and it runs entirely in the user's browser sandbox. The server orchestrates the workflow through LiveView but never sees the raw data. This isn't a policy promise: it's a structural guarantee. The code path makes it impossible.
+**Privacy.** Data that only exists in WASM linear memory cannot reach your server. Not "we promise not to look," but "the code path makes it structurally impossible." The Private Analytics demo runs AES-256-GCM encryption, DuckDB SQL queries, and PII masking entirely in the browser. The server relays opaque encrypted blobs.
 
-### Eliminate latency for interactive features
+**Latency.** WASM runs locally with sub-millisecond response. The server synchronizes state at 20Hz while users get instant feedback at 60fps. No round-trip for drawing strokes, game input, or slider adjustments.
 
-A 100ms server round-trip is fine for a button click. It's not fine for drawing strokes on a canvas, game input at 60fps, or real-time audio effects. WASM runs locally with sub-millisecond response. The server synchronizes state at 20Hz while users get instant feedback. LiveView manages the high-level state; WASM handles the tight loop.
+## Key Features
 
-### And the bridge between them
-
-Without Exclosured, you'd wire up WebSocket messages, build a custom JS bridge, manage WASM lifecycle, and handle serialization manually. With Exclosured, it's `push_event` and `handle_event`: the same API you already use in LiveView. Your Rust code calls `exclosured::emit("progress", payload)` and it arrives as a LiveView event. Your LiveView calls `Exclosured.LiveView.call(socket, :my_mod, "process", [input])` and the WASM function runs in the browser. Two languages, one communication model.
-
-## Features
-
-- **Mix compiler**: `mix compile` builds your Rust crates to `.wasm` automatically
-- **Incremental builds**: only recompiles when `.rs` / `.toml` files change
-- **LiveView integration**: bidirectional communication between Elixir and WASM via `push_event` / `handle_event`
-- **Inline WASM**: define small Rust functions directly in Elixir with `defwasm` (no Cargo setup needed)
-- **Unified wasm-bindgen**: all modules use wasm-bindgen for JS interop. Add `web-sys` when you need browser APIs.
-- **Inter-module messaging**: multiple WASM modules on the same page can communicate via a client-side event bus
-- **Dev watcher**: auto-recompile on `.rs` file changes during development
-
-## Prerequisites
-
-- Elixir ~> 1.15
-- Rust with the `wasm32-unknown-unknown` target:
-
-```sh
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-rustup target add wasm32-unknown-unknown
-```
-
-- `wasm-bindgen-cli`:
-
-```sh
-cargo install wasm-bindgen-cli
-```
-
-## Quick Start
-
-### 1. Add the dependency
+**Write Rust inline in Elixir** with `defwasm`. No Cargo workspace, no `.rs` files. Pull in any crate from crates.io via `deps:`:
 
 ```elixir
-# mix.exs
-def deps do
-  [{:exclosured, "~> 0.1.0"}]
-end
-
-def project do
-  [
-    compilers: [:exclosured] ++ Mix.compilers(),
-    # ...
-  ]
-end
-```
-
-### 2. Scaffold a WASM module
-
-```sh
-mix exclosured.init --module my_filter
-```
-
-This creates `native/wasm/` with a Cargo workspace and a starter Rust crate.
-
-### 3. Configure
-
-```elixir
-# config/config.exs
-config :exclosured,
-  modules: [
-    my_filter: []
-  ]
-```
-
-### 4. Compile
-
-```sh
-mix compile
-```
-
-Your `.wasm` file appears at `priv/static/wasm/my_filter/`.
-
-### 5. Use in the browser
-
-```javascript
-import { ExclosuredHook } from "exclosured";
-
-// Add to your LiveSocket hooks
-let liveSocket = new LiveSocket("/live", Socket, {
-  hooks: { Exclosured: ExclosuredHook }
-});
-```
-
-```heex
-<div id="wasm-filter" phx-hook="Exclosured" data-wasm-module="my_filter"></div>
-```
-
----
-
-## Examples
-
-The `examples/` directory contains complete Phoenix applications, each demonstrating a different capability. See each demo's README for motivation, trade-offs, and when to use the pattern.
-
-### Example 1: Inline WASM (Zero Setup)
-
-Define a Rust function directly in Elixir. No Cargo workspace, no `.rs` files. The macro compiles it to a standalone `.wasm` at build time.
-
-```elixir
-defmodule MyApp.Math do
-  use Exclosured.Inline
-
-  defwasm :fibonacci, args: [n: :i32] do
-    """
-    let mut a: i32 = 0;
-    let mut b: i32 = 1;
-    for _ in 0..n {
-        let tmp = b;
-        b = a + b;
-        a = tmp;
-    }
-    """
-  end
-end
-
-# After `mix compile`:
-MyApp.Math.wasm_url()     #=> "/wasm/my_app_math/my_app_math_bg.wasm"
-MyApp.Math.wasm_exports() #=> [:fibonacci]
-```
-
-### Example 2: Text Processing
-
-**Run it:** `cd examples/wasm_ai && mix deps.get && mix compile && mix phx.server` (port 4001)
-
-Offload CPU-intensive work to the user's browser. The server sends input, WASM processes it locally, and results + progress events flow back.
-
-```rust
-use wasm_bindgen::prelude::*;
-use exclosured_guest as exclosured;
-
-#[wasm_bindgen]
-pub fn process(input: &str) -> i32 {
-    let word_count = input.split_whitespace().count();
-    exclosured::emit("progress", r#"{"percent": 100}"#);
-    word_count as i32
-}
-```
-
-```elixir
-def handle_event("analyze", %{"text" => text}, socket) do
-  socket = Exclosured.LiveView.call(socket, :text_engine, "process", [text])
-  {:noreply, socket}
-end
-```
-
-### Example 3: Interactive Canvas (web-sys)
-
-**Run it:** `cd examples/canvas_demo && mix deps.get && mix compile && mix phx.server` (port 4002)
-
-A Rust WASM module drives a 60fps Canvas animation using wasm-bindgen + web-sys. LiveView pushes parameter updates without interrupting the render loop. Multiple users can sync via PubSub.
-
-### Example 4: Declarative State Sync
-
-**Run it:** `cd examples/sync_demo && mix deps.get && mix compile && mix phx.server` (port 4008)
-
-LiveView assigns automatically flow to WASM via the `sync` attribute. No manual `push_event` calls. Drag sliders to control a wave visualizer rendered at 60fps in WASM:
-
-```heex
-<Exclosured.LiveView.sandbox
-  module={:visualizer}
-  sync={Exclosured.LiveView.sync(assigns, ~w(frequency amplitude speed color)a)}
-  canvas
-/>
-```
-
-```elixir
-# The entire event handler. No push_event anywhere.
-def handle_event("update_params", params, socket) do
-  {:noreply, assign(socket, frequency: params["frequency"], speed: params["speed"])}
-end
-```
-
-When `@frequency` or `@speed` changes, the component re-renders, the `data-wasm-sync` attribute updates with the new JSON, and the hook's `updated()` callback pushes it to WASM's `apply_state()`. Zero boilerplate.
-
-### Example 5: Collaborative Image Editor
-
-**Run it:** `cd examples/realtime_sync && mix deps.get && mix compile && mix phx.server` (port 4003)
-
-Multiple users edit an image together. WASM is the source of truth for all pixel operations. The server relays small operation commands but never processes image data.
-
-### Example 6: Multiplayer Racing Game
-
-**Run it:** `cd examples/racing_game && mix deps.get && mix compile && mix phx.server` (port 4004)
-
-Server-authoritative multiplayer game. GenServer owns game state (anti-cheat, NPC spawning, timing), WASM renders at 60fps with local physics, LiveView manages lobby and leaderboard.
-
-### Example 7: Offload Computation (Server vs WASM)
-
-**Run it:** `cd examples/offload_compute && mix deps.get && mix compile && mix phx.server` (port 4005)
-
-Same CSV parsing logic runs server-side (Elixir) and client-side (WASM). Side-by-side timing comparison. Uses inline `defwasm`.
-
-### Example 8: Confidential Computation
-
-**Run it:** `cd examples/confidential_compute && mix deps.get && mix compile && mix phx.server` (port 4006)
-
-Password strength checker and SSN validator that process sensitive data entirely in the browser's WASM sandbox. The server only receives computed results, never the raw input.
-
-### Example 9: Latency Comparison
-
-**Run it:** `cd examples/latency_compare && mix deps.get && mix compile && mix phx.server` (port 4007)
-
-Drag brightness/contrast sliders on an image. Toggle between server roundtrip mode and local WASM mode to feel the difference.
-
-### Example 10: Private Analytics (E2E Encrypted Data Room)
-
-**Run it:** `cd examples/private_analytics && mix deps.get && mix compile && mix phx.server` (port 4011)
-
-The most comprehensive demo. A multi-user analytics room where one user loads a dataset into DuckDB-WASM, runs SQL queries, and shares encrypted results with other users in real-time. The server is a blind relay.
-
-This demo showcases nearly every Exclosured feature:
-
-| Feature | How it's used |
-|---|---|
-| **E2E encryption** | AES-256-GCM in Rust WASM (`aes-gcm` crate). Key in URL fragment, never sent to server. |
-| **DuckDB-WASM** | Full SQL engine running in the browser. Parquet and CSV support. |
-| **LiveView hook in Rust** | SQL editor (highlighting, input, scroll sync) is a Rust `SqlEditorHook` via `web-sys`. |
-| **PII masking** | Owner selects columns to mask. Rust WASM scans for email/phone/SSN/CC patterns. Viewers see masked data. |
-| **Histogram + profiling** | Each user runs column analysis locally in their own WASM. Canvas2D rendering via `web-sys`. |
-| **Cursor presence** | Multi-user hover indicators with color-coded dots, click-to-pin, off-page banners. |
-| **Live SQL sync** | Editors see each other's SQL in real-time via PubSub. Rust hook updates textarea + highlighting. |
-| **`defwasm` with `deps:`** | Maud crate for compile-time HTML generation in inline WASM functions. |
-| **Role-based access** | Cryptographic tokens in URL fragments. Server verifies via SHA-256 hashes. |
-| **Dual themes** | Light and dark mode with CSS variables. |
-
-Architecture: two WASM crates (`private_analytics_wasm` for crypto, `rust_hook` with 6 Rust modules for all UI logic), a thin JS coordinator (~1000 lines, down from 1735), Room GenServer with rate limiting, and Phoenix LiveView for the UI shell.
-
----
-
-## Architecture
-
-```
-Build Time                          Runtime
-──────────                          ───────
-native/wasm/                        Phoenix LiveView
-├── Cargo.toml                           │
-└── my_mod/                         push_event / handle_event
-    └── src/lib.rs                       │
-         │                          JS Hook ◄──► WASM Instance
-    cargo build                          │        (browser sandbox)
-    --target wasm32                      │
-         │                          pushEvent back to LiveView
-    wasm-bindgen
-    --target web
-         │
-         ▼
-priv/static/wasm/my_mod/
-├── my_mod.js         (JS glue)
-└── my_mod_bg.wasm    (WASM binary)
-```
-
-## Configuration Reference
-
-```elixir
-config :exclosured,
-  # Where Rust source lives (default)
-  source_dir: "native/wasm",
-
-  # Where .wasm files are output (default)
-  output_dir: "priv/static/wasm",
-
-  # Optimization: :none | :size | :speed (requires wasm-opt)
-  optimize: :none,
-
-  modules: [
-    # Default options
-    my_processor: [],
-
-    # With Cargo features
-    heavy_compute: [features: ["simd"]],
-
-    # With canvas support (auto-creates canvas element in sandbox component)
-    renderer: [canvas: true],
-
-    # Library crate (shared code, not compiled to .wasm)
-    shared: [lib: true]
-  ]
-```
-
-## Inline WASM with `defwasm`
-
-For small functions, skip the Cargo setup entirely:
-
-```elixir
-defmodule MyApp.Crypto do
-  use Exclosured.Inline
-
-  defwasm :hash_password, args: [password: :binary] do
-    """
-    // Runs in the browser. Password never leaves the client
-    let mut hash: u32 = 5381;
-    for &byte in password.iter() {
-        hash = hash.wrapping_mul(33).wrapping_add(byte as u32);
-    }
-    // Result is in WASM memory, read by JS
-    """
-  end
-end
-```
-
-The macro:
-1. Generates a Rust crate in `_build/exclosured_inline/`
-2. Compiles to `.wasm` via cargo + wasm-bindgen
-3. Copies to `priv/static/wasm/`
-4. Generates Elixir bindings (`MyApp.Crypto.wasm_url()`, etc.)
-5. Only recompiles when the Rust source changes
-
-### External Crate Dependencies
-
-Use the `deps:` option to pull in any crate from crates.io:
-
-```elixir
-defmodule MyApp.HtmlRenderer do
+defmodule MyApp.Renderer do
   use Exclosured.Inline
 
   defwasm :render_card, args: [data: :binary], deps: [maud: "0.26"] do
     ~S"""
     use maud::html;
-
-    let markup = html! {
-        div class="card" {
-            h3 { (title) }
-            p { (description) }
-        }
-    };
+    let markup = html! { div class="card" { h3 { (title) } } };
     let bytes = markup.into_string().into_bytes();
-    let n = bytes.len().min(data.len());
-    data[..n].copy_from_slice(&bytes[..n]);
-    return n as i32;
+    data[..bytes.len()].copy_from_slice(&bytes);
+    return bytes.len() as i32;
     """
   end
 end
 ```
 
-[Maud](https://maud.lambda.xyz/) validates HTML structure at Rust compile time and auto-escapes all interpolated values. Any pure-Rust crate that compiles to wasm32 works: `serde`, `regex`, `chrono`, `image`, etc.
-
-### LiveView Hooks in Rust
-
-You can write Phoenix LiveView hooks entirely in Rust/WASM. The hook lifecycle (`mounted`, `updated`, `destroyed`) maps to Rust methods. DOM access via `web-sys`. Events via a `pushEvent` callback injected from JS:
+**Write LiveView hooks in Rust.** DOM access via `web-sys`, events via a `pushEvent` callback. JS becomes a 10-line shim:
 
 ```rust
 #[wasm_bindgen]
-pub struct MyHook {
-    el: HtmlElement,
-    push_event: js_sys::Function,
-}
+pub struct MyHook { el: HtmlElement, push_event: js_sys::Function }
 
 #[wasm_bindgen]
 impl MyHook {
-    #[wasm_bindgen(constructor)]
-    pub fn new(el: HtmlElement, push_event: js_sys::Function) -> Self { ... }
-    pub fn mounted(&mut self) { /* DOM setup, event listeners */ }
+    pub fn mounted(&mut self) { /* full DOM access, event listeners, canvas rendering */ }
     pub fn on_event(&self, event: &str, payload: &str) { /* handle server events */ }
 }
 ```
 
-```javascript
-// JS is just a thin shim (10 lines):
-const mod = await import("/wasm/my_hook/my_hook.js");
-await mod.default("/wasm/my_hook/my_hook_bg.wasm");
-this._hook = new mod.MyHook(this.el, (e, p) => this.pushEvent(e, p));
-this._hook.mounted();
-```
+**Declarative state sync.** LiveView assigns flow to WASM automatically:
 
-The Private Analytics demo uses this pattern: the SQL editor (syntax highlighting, input handling, scroll sync, keyboard shortcuts) is a Rust LiveView hook with zero JS logic.
-
-## Inline vs Full Workspace
-
-Exclosured supports two ways to write WASM modules. Use whichever fits the task.
-
-**Inline `defwasm`**: for leaf functions where the Cargo setup would be more code than the logic itself. Zero ceremony, tiny binaries, type declarations drive all FFI boilerplate. Supports external crates via the `deps:` option. No persistent state.
-
-**Full Cargo workspace**: for anything substantial. Full crates.io ecosystem, multi-file Rust projects, `cargo test`, rust-analyzer support, `web-sys` for Canvas/WebGPU access, persistent state with `thread_local!`, shared library crates across modules.
-
-| | Inline `defwasm` | Full workspace |
-|---|---|---|
-| Lines of Rust | < 50 | Any size |
-| External crates | Yes (via `deps:`) | Yes |
-| Browser APIs (web-sys) | No | Yes |
-| Persistent state | No | Yes |
-| LiveView hooks in Rust | No | Yes |
-| Rust testing | No | `cargo test` |
-| IDE support | String in Elixir | Full rust-analyzer |
-| Setup cost | Zero | Cargo workspace |
-
-## Typed Events
-
-Generate Elixir structs from annotated Rust structs. Annotate with `/// exclosured:event` and the macro generates matching Elixir modules at compile time:
-
-```rust
-// In your Rust WASM module
-/// exclosured:event
-pub struct ProgressEvent {
-    pub percent: u32,
-    pub stage: String,
-}
-```
-
-```elixir
-defmodule MyApp.Events do
-  use Exclosured.Events, source: "native/wasm/my_mod/src/lib.rs"
-end
-
-# Now use the generated structs:
-event = MyApp.Events.ProgressEvent.from_payload(payload)
-event.percent #=> 75
-event.stage   #=> "processing"
-```
-
-Rust types map to Elixir types automatically: `u32` -> `integer()`, `String` -> `String.t()`, `Vec<T>` -> `list()`, `Option<T>` -> `T | nil`.
-
-## Elixir API
-
-```elixir
-# Get the browser-accessible URL for a module's .wasm
-Exclosured.wasm_url(:my_mod)       #=> "/wasm/my_mod/my_mod_bg.wasm"
-
-# Get the JS glue URL
-Exclosured.wasm_js_url(:my_mod)    #=> "/wasm/my_mod/my_mod.js"
-
-# List all configured modules
-Exclosured.modules()               #=> [:my_mod, :renderer]
-
-# LiveView: call a WASM function on the client
-Exclosured.LiveView.call(socket, :my_mod, "process", [input])
-
-# LiveView: call with server fallback (if WASM hasn't loaded yet)
-Exclosured.LiveView.call(socket, :my_mod, "process", [input],
-  fallback: fn [input] -> MyApp.process_on_server(input) end
-)
-# Result arrives via {:wasm_result, ...} either way. Your handle_info is identical.
-
-# LiveView: push state to a WASM module
-Exclosured.LiveView.push_state(socket, :renderer, %{speed: 50})
-
-# LiveView: declarative state sync (auto-pushes when assigns change)
-~H"""
+```heex
 <Exclosured.LiveView.sandbox
-  module={:renderer}
+  module={:visualizer}
   sync={Exclosured.LiveView.sync(assigns, ~w(speed color count)a)}
   canvas
 />
-"""
+```
 
-# LiveView: streaming results (accumulate incremental WASM output)
+No `push_event` calls. When `@speed` changes, the component re-renders and the hook pushes the new value to WASM's `apply_state()`.
+
+**Streaming results.** WASM emits incremental chunks, LiveView accumulates:
+
+```elixir
 Exclosured.LiveView.stream_call(socket, :processor, "analyze", [data],
   on_chunk: fn chunk, socket -> update(socket, :results, &[chunk | &1]) end,
   on_done: fn socket -> assign(socket, processing: false) end
 )
 ```
 
-## Guest Crate
-
-The `exclosured_guest` Rust crate provides helpers for WASM modules:
-
-```rust
-use exclosured_guest as exclosured;
-
-// Send an event to LiveView
-exclosured::emit("progress", r#"{"percent": 50}"#);
-
-// Broadcast to other WASM modules on the same page (client-side only)
-exclosured::broadcast("ai:result", &json_payload);
-
-// Memory management (used by JS to write data into WASM memory)
-// alloc(size) and dealloc(ptr, size) are exported automatically
-```
-
-## Telemetry
-
-Exclosured emits `:telemetry` events for observability. Attach handlers to monitor WASM compilation and runtime operations.
-
-**Compilation events:**
-
-| Event | Measurements | Metadata |
-|---|---|---|
-| `[:exclosured, :compile, :start]` | `system_time` | `module` |
-| `[:exclosured, :compile, :stop]` | `duration` | `module`, `wasm_size` |
-| `[:exclosured, :compile, :error]` | `duration` | `module`, `error` |
-
-**Runtime events** (emitted during LiveView operation):
-
-| Event | Metadata |
-|---|---|
-| `[:exclosured, :wasm, :call]` | `module`, `func` |
-| `[:exclosured, :wasm, :result]` | `module`, `func` |
-| `[:exclosured, :wasm, :emit]` | `module`, `event` |
-| `[:exclosured, :wasm, :error]` | `module`, `func`, `error` |
-| `[:exclosured, :wasm, :ready]` | `module` |
-
-**Example: attach a logger**
+**Server fallback.** If WASM fails to load, the same `call/5` runs an Elixir function instead. Result shape is identical:
 
 ```elixir
-# In your application.ex start/2
-:telemetry.attach_many(
-  "exclosured-logger",
-  [
-    [:exclosured, :compile, :stop],
-    [:exclosured, :wasm, :call],
-    [:exclosured, :wasm, :emit]
-  ],
-  fn event, measurements, metadata, _config ->
-    Logger.info("[exclosured] #{inspect(event)} #{inspect(metadata)}")
-  end,
-  nil
+Exclosured.LiveView.call(socket, :my_mod, "process", [input],
+  fallback: fn [input] -> process_on_server(input) end
 )
 ```
 
-These events integrate directly with [Phoenix LiveDashboard](https://github.com/phoenixframework/phoenix_live_dashboard) and any `:telemetry`-based monitoring tool.
+**Typed events.** Annotate Rust structs, get Elixir structs at compile time:
 
-## How Exclosured Compares to Other Elixir Libraries
+```rust
+/// exclosured:event
+pub struct ProgressEvent { pub percent: u32, pub stage: String }
+```
 
-Several Elixir libraries work with Rust or WASM. They solve different problems.
+```elixir
+defmodule MyApp.Events do
+  use Exclosured.Events, source: "native/wasm/my_mod/src/lib.rs"
+end
+# MyApp.Events.ProgressEvent.from_payload(payload) => %ProgressEvent{percent: 75, stage: "done"}
+```
 
-**[Rustler](https://github.com/rusterlium/rustler)** compiles Rust into NIFs that run inside the BEAM VM. Used by hundreds of projects for performance-critical server-side code (JSON parsing, crypto, image processing). The Rust code runs on your server, inside the BEAM. A NIF crash takes down the VM.
+**Telemetry.** Every WASM call, emit, error, and compilation emits `:telemetry` events. Plug into LiveDashboard or any monitoring tool.
 
-**[Wasmex](https://github.com/tessi/wasmex)** runs WASM modules inside the BEAM VM using Wasmtime. You load a `.wasm` file on the server and call its functions from Elixir. Useful for sandboxing untrusted code or plugin systems. Still server-side, still uses your CPU.
+## Prerequisites
 
-**[Orb](https://github.com/RoyalIcing/Orb)** lets you write WASM modules in Elixir syntax (no Rust needed). The Elixir code compiles to WASM bytecode at build time. Targets server-side execution and has a more limited instruction set than full Rust.
+- Elixir >= 1.15 and Erlang/OTP >= 26
+- Rust with the wasm32 target and wasm-bindgen:
 
-**Exclosured** compiles Rust to WASM and delivers it to the user's browser, with LiveView as the communication layer. None of the others do this.
+```sh
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+rustup target add wasm32-unknown-unknown
+cargo install wasm-bindgen-cli
+```
+
+## Quick Start
+
+```elixir
+# mix.exs
+def project do
+  [compilers: [:exclosured] ++ Mix.compilers(), ...]
+end
+
+def deps do
+  [{:exclosured, "~> 0.1.0"}]
+end
+```
+
+```sh
+mix exclosured.init --module my_filter  # scaffold Cargo workspace + starter crate
+mix compile                              # builds Rust to .wasm automatically
+```
+
+```elixir
+# config/config.exs
+config :exclosured, modules: [my_filter: []]
+```
+
+```heex
+<%# In your LiveView template %>
+<div id="wasm" phx-hook="Exclosured" data-wasm-module="my_filter"></div>
+```
+
+## Examples
+
+Ten complete Phoenix applications in `examples/`, each with its own README explaining motivation, trade-offs, and when to use the pattern.
+
+| # | Demo | Port | What it shows |
+|---|---|---|---|
+| 1 | Inline WASM | (code only) | `defwasm` macro, zero setup |
+| 2 | [Text Processing](examples/wasm_ai/) | 4001 | Compute offload, progress events |
+| 3 | [Interactive Canvas](examples/canvas_demo/) | 4002 | 60fps wasm-bindgen rendering, PubSub sync |
+| 4 | [State Sync](examples/sync_demo/) | 4008 | Declarative `sync` attribute, wave visualizer |
+| 5 | [Image Editor](examples/realtime_sync/) | 4003 | Collaborative editing, WASM as source of truth |
+| 6 | [Racing Game](examples/racing_game/) | 4004 | Server-authoritative multiplayer, anti-cheat |
+| 7 | [Offload Compute](examples/offload_compute/) | 4005 | Server vs WASM side-by-side timing |
+| 8 | [Confidential Compute](examples/confidential_compute/) | 4006 | PII stays in browser, server sees only results |
+| 9 | [Latency Compare](examples/latency_compare/) | 4007 | Server round-trip vs local WASM, feel the difference |
+| 10 | [**Private Analytics**](examples/private_analytics/) | 4011 | E2E encrypted multi-user analytics with DuckDB-WASM, PII masking, Rust LiveView hooks, cursor presence |
+
+To run any demo: `cd examples/<name> && mix deps.get && mix compile && mix phx.server`
+
+## Inline vs Full Workspace
+
+| | Inline `defwasm` | Full Cargo workspace |
+|---|---|---|
+| Lines of Rust | < 50 | Any size |
+| External crates | Yes (via `deps:`) | Yes |
+| Browser APIs (web-sys) | No | Yes |
+| LiveView hooks in Rust | No | Yes |
+| Persistent state | No | Yes |
+| Rust testing | No | `cargo test` |
+| IDE support | String in Elixir | Full rust-analyzer |
+| Setup cost | Zero | Cargo workspace |
+
+## Configuration
+
+```elixir
+config :exclosured,
+  source_dir: "native/wasm",         # where Rust source lives
+  output_dir: "priv/static/wasm",    # where .wasm files go
+  optimize: :none,                    # :none | :size | :speed (requires wasm-opt)
+  modules: [
+    my_processor: [],                 # default options
+    renderer: [canvas: true],         # auto-creates canvas in sandbox component
+    shared: [lib: true]               # library crate, not compiled to .wasm
+  ]
+```
+
+## API Reference
+
+```elixir
+# URLs
+Exclosured.wasm_url(:my_mod)        #=> "/wasm/my_mod/my_mod_bg.wasm"
+Exclosured.wasm_js_url(:my_mod)     #=> "/wasm/my_mod/my_mod.js"
+
+# Call WASM from LiveView
+Exclosured.LiveView.call(socket, :mod, "func", [args])
+Exclosured.LiveView.call(socket, :mod, "func", [args], fallback: fn [args] -> ... end)
+
+# Push state
+Exclosured.LiveView.push_state(socket, :mod, %{key: value})
+
+# Declarative sync (auto-pushes on assign change)
+Exclosured.LiveView.sync(assigns, [:key1, :key2, renamed: :original_key])
+
+# Streaming results
+Exclosured.LiveView.stream_call(socket, :mod, "func", [args],
+  on_chunk: fn chunk, socket -> ... end,
+  on_done: fn socket -> ... end
+)
+
+# HEEx component
+~H"<Exclosured.LiveView.sandbox module={:mod} sync={...} canvas />"
+```
+
+```rust
+// Rust guest crate
+exclosured::emit("event_name", r#"{"key": "value"}"#);  // send to LiveView
+exclosured::broadcast("channel", &payload);               // send to other WASM modules
+```
+
+## Compared to Other Libraries
 
 | | Rustler | Wasmex | Orb | Exclosured |
 |---|---|---|---|---|
-| Where code runs | Server (BEAM) | Server (BEAM) | Server (BEAM) | User's browser |
-| Compilation target | NIF (.so/.dll) | .wasm (server) | .wasm (server) | .wasm (browser) |
-| Performance benefit | Faster server code | Sandboxed server code | Elixir-authored WASM | Offloads work from server entirely |
-| Data privacy | Server sees everything | Server sees everything | Server sees everything | Server can be excluded from data path |
-| LiveView integration | None | None | None | Bidirectional `push_event`/`handle_event` |
+| Where code runs | Server | Server | Server | Browser |
+| Compilation target | NIF | .wasm (server) | .wasm (server) | .wasm (browser) |
+| Server CPU usage | Increases | Increases | Increases | Zero for offloaded tasks |
+| Data privacy | Server sees all | Server sees all | Server sees all | Server can be excluded |
+| LiveView integration | None | None | None | Bidirectional |
 
-### What's unique to Exclosured
-
-- **The execution target is the browser, not the server.** Every other library runs code on the server. Exclosured runs code on the client. This changes the cost model (server CPU drops to zero for offloaded tasks), the privacy model (server never receives sensitive data), and the latency model (local computation, no round-trip).
-
-- **LiveView is the communication layer.** `exclosured::emit("event", payload)` in Rust arrives as a LiveView `handle_info` message. `Exclosured.LiveView.call(socket, :mod, "func", args)` triggers a WASM function in the browser. No manual WebSocket plumbing.
-
-- **`defwasm` inline compilation.** Write Rust inside an Elixir module, compile to a browser-loadable `.wasm` at `mix compile` time. No other Elixir library offers this.
-
-- **Server-authority + client-rendering split.** Patterns like the racing game demo (GenServer owns game state, WASM renders at 60fps, LiveView manages lobby/UI) require a separate frontend app with any other library.
-
-### When to use the others instead
-
-Exclosured does not replace Rustler or Wasmex:
-
-- Need faster server-side JSON parsing or crypto? Use **Rustler**. The data is already on the server.
-- Need to run user-submitted plugins safely on the server? Use **Wasmex**. Browser execution is irrelevant for server-side sandboxing.
-- Want WASM without learning Rust? Consider **Orb** for server-side execution.
-- Users have weak devices (IoT, old phones)? Keep computation on the server. Your server is always faster than the worst client.
-
-Exclosured occupies the intersection of Rust performance, browser-side execution, and LiveView integration. The trade-off is complexity (three languages in one feature) and the requirement that the computation can actually happen on the client.
+Use **Rustler** for server-side performance. Use **Wasmex** for server-side sandboxing. Use **Exclosured** when the computation should happen in the browser.
 
 ## License
 
