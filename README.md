@@ -185,7 +185,7 @@ let liveSocket = new LiveSocket("/live", Socket, {
 
 ## Examples
 
-Fourteen example applications in `examples/`, each with its own README.
+Fifteen example applications in `examples/`, each with its own README.
 
 | # | Demo | What it shows |
 |---|---|---|
@@ -203,6 +203,7 @@ Fourteen example applications in `examples/`, each with its own README.
 | 12 | [LiveSvelte + WASM](examples/live_svelte_wasm/) | Svelte integration, WASM markdown editor + KaTeX |
 | 13 | [Kino Data Explorer](examples/kino_exclosured/) | Livebook smart cell, WASM stats with JS fallback |
 | 14 | [**Brotli Compress**](examples/brotli_compress/) | Brotli (WASM) vs Gzip (JS) compression benchmark |
+| 15 | [**Matrix Multiply**](examples/matrix_mul/) | nalgebra (WASM) vs JS nested loops, GFLOPS comparison |
 
 Most demos run with `cd examples/<name> && mix setup && mix phx.server`. Some examples require additional setup (npm, Vite, etc.); see each example's README for details.
 

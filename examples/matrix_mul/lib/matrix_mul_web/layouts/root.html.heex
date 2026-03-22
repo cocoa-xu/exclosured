@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="csrf-token" content={Phoenix.Controller.get_csrf_token()} />
+    <title>Matrix Multiplication Benchmark - Exclosured</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body {
+        font-family: system-ui, -apple-system, sans-serif;
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 2rem;
+        background: #1a1a2e;
+        color: #eee;
+      }
+      .header {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 0.5rem;
+        flex-wrap: wrap;
+      }
+      h1 { color: #e94560; font-size: 1.4rem; }
+      .badge {
+        display: inline-block;
+        padding: 0.25rem 0.75rem;
+        border-radius: 999px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+      .badge-wasm { background: rgba(123, 237, 159, 0.15); color: #7bed9f; border: 1px solid rgba(123, 237, 159, 0.3); }
+      .badge-status { background: rgba(233, 69, 96, 0.15); color: #e94560; border: 1px solid rgba(233, 69, 96, 0.3); }
+      .badge-ready { background: rgba(123, 237, 159, 0.15); color: #7bed9f; border: 1px solid rgba(123, 237, 159, 0.3); }
+      p.desc { color: #aaa; margin-bottom: 1.5rem; line-height: 1.5; font-size: 0.95rem; }
+
+      .controls {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin-bottom: 1rem;
+        flex-wrap: wrap;
+      }
+      .controls label {
+        color: #ccc;
+        font-weight: 600;
+        font-size: 0.9rem;
+      }
+      .size-btn {
+        padding: 0.4rem 1rem;
+        border-radius: 6px;
+        border: 1px solid #333;
+        background: #16213e;
+        color: #aaa;
+        cursor: pointer;
+        font-size: 0.85rem;
+        font-weight: 600;
+        transition: all 0.15s;
+      }
+      .prec-btn {
+        padding: 0.4rem 1rem;
+        border-radius: 6px;
+        border: 1px solid #333;
+        background: #16213e;
+        color: #aaa;
+        cursor: pointer;
+        font-size: 0.85rem;
+        font-weight: 600;
+        transition: all 0.15s;
+      }
+      .prec-btn:hover { border-color: #7bed9f; color: #eee; }
+      .prec-btn.active {
+        background: rgba(123, 237, 159, 0.15);
+        border-color: #7bed9f;
+        color: #7bed9f;
+      }
+      .size-btn:hover { border-color: #e94560; color: #eee; }
+      .size-btn.active {
+        background: rgba(233, 69, 96, 0.15);
+        border-color: #e94560;
+        color: #e94560;
+      }
+      .run-btn {
+        padding: 0.5rem 1.75rem;
+        border-radius: 8px;
+        border: none;
+        background: #e94560;
+        color: #fff;
+        font-size: 0.9rem;
+        font-weight: 700;
+        cursor: pointer;
+        margin-left: 0.5rem;
+      }
+      .run-btn:hover { background: #d63851; }
+      .run-btn:disabled { background: #555; cursor: not-allowed; color: #999; }
+
+      .progress {
+        margin-bottom: 1rem;
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+      }
+      .progress-step {
+        padding: 0.3rem 0.6rem;
+        border-radius: 6px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        background: #16213e;
+        color: #555;
+        border: 1px solid #333;
+      }
+      .progress-step.active {
+        color: #e94560;
+        border-color: #e94560;
+        animation: pulse-border 1s ease-in-out infinite;
+      }
+      .progress-step.done { color: #7bed9f; border-color: #7bed9f; }
+      .progress-step.error { color: #e94560; border-color: #e94560; }
+      .progress-step.skip { color: #888; border-color: #444; }
+      @keyframes pulse-border {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+      }
+
+      /* Results table */
+      .results-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 1rem;
+        background: #16213e;
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      .results-table th {
+        text-align: left;
+        padding: 0.75rem 1rem;
+        font-size: 0.8rem;
+        color: #888;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        border-bottom: 1px solid #333;
+        background: #0f1a2e;
+      }
+      .results-table td {
+        padding: 0.65rem 1rem;
+        font-size: 0.9rem;
+        border-bottom: 1px solid rgba(255,255,255,0.04);
+      }
+      .results-table tr:last-child td { border-bottom: none; }
+      .results-table tr.winner-row td { background: rgba(255,255,255,0.03); }
+
+      .engine-name { font-weight: 700; }
+      .engine-sub { font-size: 0.75rem; color: #666; display: block; }
+      .c-js { color: #f9ca24; }
+      .c-wasm { color: #7bed9f; }
+      .c-gpu { color: #a29bfe; }
+      .c-tf { color: #ff6b6b; }
+      .c-cv { color: #ffa502; }
+      .val { font-weight: 600; font-variant-numeric: tabular-nums; }
+      .val-na { color: #555; font-style: italic; }
+      .crown { font-size: 1.1rem; margin-right: 0.25rem; }
+
+      .winner-banner {
+        margin-top: 1.5rem;
+        padding: 0.75rem 1rem;
+        border-radius: 8px;
+        font-size: 0.9rem;
+        font-weight: 600;
+        text-align: center;
+        display: none;
+      }
+
+      .load-status {
+        display: flex;
+        gap: 1rem;
+        margin-bottom: 1rem;
+        flex-wrap: wrap;
+        font-size: 0.8rem;
+      }
+      .load-item { color: #666; }
+      .load-item.ready { color: #7bed9f; }
+      .load-item.failed { color: #e94560; }
+
+      .note {
+        margin-top: 2rem;
+        padding: 1rem 1.25rem;
+        border-radius: 8px;
+        background: rgba(233, 69, 96, 0.08);
+        border: 1px solid rgba(233, 69, 96, 0.2);
+        color: #bbb;
+        font-size: 0.85rem;
+        line-height: 1.6;
+      }
+      .note strong { color: #e94560; }
+      .note code {
+        background: rgba(255,255,255,0.08);
+        padding: 0.1rem 0.35rem;
+        border-radius: 3px;
+        font-size: 0.82rem;
+      }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
+    <script id="opencv-script" async src="https://docs.opencv.org/4.12.0/opencv.js"></script>
+  </head>
+  <body>
+    <div class="header">
+      <h1>Matrix Multiply: 5-Way Benchmark</h1>
+      <span class="badge badge-wasm">Exclosured</span>
+      <span id="wasm-status" class="badge badge-status">Loading...</span>
+    </div>
+    <p class="desc">
+      Compare N&#xD7;N matrix multiplication across five engines:
+      pure JS loops, Rust nalgebra (WASM), WebGPU compute shader,
+      TensorFlow.js, and OpenCV.js.
+    </p>
+
+    <div class="load-status">
+      <span class="load-item" id="load-wasm">WASM: loading</span>
+      <span class="load-item" id="load-gpu">WebGPU: checking</span>
+      <span class="load-item" id="load-tf">TF.js: loading</span>
+      <span class="load-item" id="load-cv">OpenCV.js: loading</span>
+    </div>
+
+    <%= @inner_content %>
+
+    <div class="controls">
+      <label>Size:</label>
+      <button class="size-btn" data-n="64">64</button>
+      <button class="size-btn" data-n="128">128</button>
+      <button class="size-btn active" data-n="256">256</button>
+      <button class="size-btn" data-n="512">512</button>
+      <button class="size-btn" data-n="1024">1024</button>
+    </div>
+    <div class="controls">
+      <label>Type:</label>
+      <button class="prec-btn active" data-prec="f32">f32</button>
+      <button class="prec-btn" data-prec="f64">f64</button>
+      <button class="prec-btn" data-prec="i32">i32</button>
+      <button class="prec-btn" data-prec="i16">i16</button>
+      <button class="prec-btn" data-prec="i8">i8</button>
+      <button id="run-btn" class="run-btn" disabled>Run Benchmark</button>
+      <button id="stop-btn" class="run-btn" style="display:none;background:#e94560">Stop</button>
+    </div>
+
+    <div id="progress" class="progress" style="display:none">
+      <div class="progress-step" id="step-gen">Generate</div>
+      <div class="progress-step" id="step-js">JS</div>
+      <div class="progress-step" id="step-wasm">WASM</div>
+      <div class="progress-step" id="step-gpu">WebGPU</div>
+      <div class="progress-step" id="step-tf">TF.js</div>
+      <div class="progress-step" id="step-cv">OpenCV</div>
+    </div>
+
+    <table class="results-table" id="results-table" style="display:none">
+      <thead>
+        <tr>
+          <th>Engine</th>
+          <th>Time</th>
+          <th>GFLOPS</th>
+          <th>Checksum</th>
+          <th>Precision</th>
+        </tr>
+      </thead>
+      <tbody id="results-body">
+      </tbody>
+    </table>
+
+    <div id="winner" class="winner-banner"></div>
+
+    <div class="note">
+      <strong>Note:</strong> JS and WASM (nalgebra) use <code>f64</code>
+      (double precision). WebGPU, TensorFlow.js, and OpenCV.js use
+      <code>f32</code> (single precision) by default, so their checksums
+      will differ slightly. TF.js auto-selects its best backend (WebGL/WebGPU/WASM).
+    </div>
+
+    <script defer phx-track-static src={"/assets/app.js"}></script>
+  </body>
+</html>
