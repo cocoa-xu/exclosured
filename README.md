@@ -1,5 +1,8 @@
 # Exclosured
 
+[![npm](https://img.shields.io/npm/v/exclosured)](https://www.npmjs.com/package/exclosured)
+[![CI](https://github.com/cocoa-xu/exclosured/actions/workflows/ci.yml/badge.svg)](https://github.com/cocoa-xu/exclosured/actions/workflows/ci.yml)
+
 Compile Rust to WebAssembly, run it in your users' browsers, and talk to it from Phoenix LiveView.
 
 > *exclosure* (n.): an ecological term for a fenced area that excludes external interference. Your WASM code runs in a browser sandbox, isolated and secure.
@@ -15,6 +18,8 @@ This changes three things:
 **Privacy.** Data that only exists in WASM linear memory cannot reach your server. Not "we promise not to look," but "the code path makes it structurally impossible." The Private Analytics demo runs AES-256-GCM encryption, DuckDB SQL queries, and PII masking entirely in the browser. The server relays opaque encrypted blobs.
 
 **Latency.** WASM runs locally with sub-millisecond response. The server synchronizes state at 20Hz while users get instant feedback at 60fps. No round-trip for drawing strokes, game input, or slider adjustments.
+
+**Resource-constrained servers.** If your Phoenix app runs on a Raspberry Pi, a Nerves device, or an edge gateway, the server has limited CPU and memory. Exclosured lets you offload computation-intensive tasks (image processing, data analysis, crypto) to the user's browser, which typically has far more resources. The embedded server only manages state and serves the UI.
 
 ## Key Features
 
@@ -126,6 +131,21 @@ mix compile                              # builds Rust to .wasm automatically
 ```elixir
 # config/config.exs
 config :exclosured, modules: [my_filter: []]
+```
+
+Install the JS hook (one copy shared across all packages that use Exclosured):
+
+```sh
+cd assets && npm install exclosured
+```
+
+```javascript
+// assets/js/app.js
+import { ExclosuredHook } from "exclosured";
+
+let liveSocket = new LiveSocket("/live", Socket, {
+  hooks: { Exclosured: ExclosuredHook }
+});
 ```
 
 ```heex
