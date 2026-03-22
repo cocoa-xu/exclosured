@@ -1,6 +1,8 @@
 # Exclosured
 
+[![Hex.pm](https://img.shields.io/hexpm/v/exclosured)](https://hex.pm/packages/exclosured)
 [![npm](https://img.shields.io/npm/v/exclosured)](https://www.npmjs.com/package/exclosured)
+[![crates.io](https://img.shields.io/crates/v/exclosured_guest)](https://crates.io/crates/exclosured_guest)
 [![CI](https://github.com/cocoa-xu/exclosured/actions/workflows/ci.yml/badge.svg)](https://github.com/cocoa-xu/exclosured/actions/workflows/ci.yml)
 
 Compile Rust to WebAssembly, run it in your users' browsers, and talk to it from Phoenix LiveView.
