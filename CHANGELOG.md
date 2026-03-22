@@ -10,9 +10,9 @@ This project publishes to three registries. Version bumps are kept in sync.
 | [npmjs.com](https://www.npmjs.com/package/exclosured) | `exclosured` (JS LiveView hook) |
 | [crates.io](https://crates.io/crates/exclosured_guest) | `exclosured_guest` (Rust guest crate) |
 
-## Unreleased
+## 0.1.1
 
-### hex.pm (exclosured)
+### hex.pm (exclosured@0.1.1)
 
 - Added: `deps:` in `defwasm` now supports keyword options for Cargo features:
   `{"serde", "1", features: ["derive"]}` generates
