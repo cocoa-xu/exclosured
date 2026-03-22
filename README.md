@@ -185,7 +185,7 @@ let liveSocket = new LiveSocket("/live", Socket, {
 
 ## Examples
 
-Thirteen example applications in `examples/`, each with its own README.
+Fourteen example applications in `examples/`, each with its own README.
 
 | # | Demo | What it shows |
 |---|---|---|
@@ -200,8 +200,9 @@ Thirteen example applications in `examples/`, each with its own README.
 | 9 | [Latency Compare](examples/latency_compare/) | Server round-trip vs local WASM |
 | 10 | [**Private Analytics**](examples/private_analytics/) | E2E encrypted analytics, DuckDB-WASM, Rust hooks |
 | 11 | [LiveVue + WASM](examples/live_vue_wasm/) | Vue.js integration, real-time stats dashboard |
-| 12 | [LiveSvelte + WASM](examples/live_svelte_wasm/) | Svelte integration, WASM markdown editor |
+| 12 | [LiveSvelte + WASM](examples/live_svelte_wasm/) | Svelte integration, WASM markdown editor + KaTeX |
 | 13 | [Kino Data Explorer](examples/kino_exclosured/) | Livebook smart cell, WASM stats with JS fallback |
+| 14 | [**Brotli Compress**](examples/brotli_compress/) | Brotli (WASM) vs Gzip (JS) compression benchmark |
 
 Most demos run with `cd examples/<name> && mix setup && mix phx.server`. Some examples require additional setup (npm, Vite, etc.); see each example's README for details.
 

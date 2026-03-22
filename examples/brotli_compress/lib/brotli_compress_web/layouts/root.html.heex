@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="csrf-token" content={Phoenix.Controller.get_csrf_token()} />
+    <title>Brotli vs Gzip Compression - Exclosured</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body {
+        font-family: system-ui, -apple-system, sans-serif;
+        max-width: 960px;
+        margin: 0 auto;
+        padding: 2rem;
+        background: #1a1a2e;
+        color: #eee;
+      }
+      .header {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 0.5rem;
+        flex-wrap: wrap;
+      }
+      h1 { color: #e94560; font-size: 1.5rem; }
+      .badge {
+        display: inline-block;
+        padding: 0.25rem 0.75rem;
+        border-radius: 999px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+      .badge-wasm { background: rgba(123, 237, 159, 0.15); color: #7bed9f; border: 1px solid rgba(123, 237, 159, 0.3); }
+      .badge-status { background: rgba(233, 69, 96, 0.15); color: #e94560; border: 1px solid rgba(233, 69, 96, 0.3); }
+      .badge-ready { background: rgba(123, 237, 159, 0.15); color: #7bed9f; border: 1px solid rgba(123, 237, 159, 0.3); }
+      p.desc { color: #aaa; margin-bottom: 1.5rem; line-height: 1.5; }
+      label { color: #ccc; font-weight: 600; display: block; margin-bottom: 0.5rem; }
+      textarea {
+        width: 100%;
+        height: 220px;
+        padding: 0.75rem;
+        border-radius: 8px;
+        border: 1px solid #333;
+        background: #16213e;
+        color: #eee;
+        font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+        font-size: 0.82rem;
+        resize: vertical;
+        line-height: 1.5;
+        tab-size: 2;
+      }
+      textarea:focus { outline: none; border-color: #e94560; }
+      .original-size {
+        margin-top: 0.75rem;
+        font-size: 0.9rem;
+        color: #aaa;
+      }
+      .original-size span { color: #eee; font-weight: 600; }
+      .results {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+        margin-top: 1.5rem;
+      }
+      .panel {
+        padding: 1.25rem;
+        border-radius: 8px;
+        background: #16213e;
+        border: 1px solid #333;
+      }
+      .panel h3 {
+        margin-bottom: 0.25rem;
+        font-size: 1rem;
+      }
+      .panel .subtitle {
+        font-size: 0.8rem;
+        color: #666;
+        margin-bottom: 1rem;
+      }
+      .panel-gzip h3 { color: #f9ca24; }
+      .panel-brotli h3 { color: #7bed9f; }
+      .stat-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.5rem 0;
+        border-bottom: 1px solid rgba(255,255,255,0.05);
+      }
+      .stat-row:last-child { border-bottom: none; }
+      .stat-label { color: #888; font-size: 0.85rem; }
+      .stat-value { font-weight: 600; font-size: 0.95rem; }
+      .stat-value-gzip { color: #f9ca24; }
+      .stat-value-brotli { color: #7bed9f; }
+      .bar-container {
+        margin-top: 1rem;
+        height: 8px;
+        background: rgba(255,255,255,0.05);
+        border-radius: 4px;
+        overflow: hidden;
+      }
+      .bar-fill {
+        height: 100%;
+        border-radius: 4px;
+        transition: width 0.4s ease;
+      }
+      .bar-fill-gzip { background: #f9ca24; }
+      .bar-fill-brotli { background: #7bed9f; }
+      .bar-label {
+        margin-top: 0.3rem;
+        font-size: 0.75rem;
+        color: #666;
+        text-align: right;
+      }
+      .note {
+        margin-top: 2rem;
+        padding: 1rem 1.25rem;
+        border-radius: 8px;
+        background: rgba(233, 69, 96, 0.08);
+        border: 1px solid rgba(233, 69, 96, 0.2);
+        color: #bbb;
+        font-size: 0.85rem;
+        line-height: 1.6;
+      }
+      .note strong { color: #e94560; }
+      .placeholder {
+        color: #555;
+        font-style: italic;
+        font-size: 0.9rem;
+        padding: 0.5rem 0;
+      }
+      .winner {
+        margin-top: 1.5rem;
+        padding: 0.75rem 1rem;
+        border-radius: 8px;
+        font-size: 0.9rem;
+        font-weight: 600;
+        text-align: center;
+        display: none;
+      }
+      .winner-brotli {
+        background: rgba(123, 237, 159, 0.1);
+        border: 1px solid rgba(123, 237, 159, 0.3);
+        color: #7bed9f;
+        display: block;
+      }
+      .winner-gzip {
+        background: rgba(249, 202, 36, 0.1);
+        border: 1px solid rgba(249, 202, 36, 0.3);
+        color: #f9ca24;
+        display: block;
+      }
+      .controls-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 0.75rem;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+      }
+      .quality-control {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.85rem;
+        color: #aaa;
+      }
+      .quality-control label { margin: 0; font-size: 0.85rem; }
+      .quality-control input[type="range"] { width: 120px; accent-color: #7bed9f; }
+      #quality-value {
+        font-weight: 700;
+        color: #7bed9f;
+        min-width: 1.5em;
+        text-align: center;
+      }
+      .quality-hint {
+        font-size: 0.75rem;
+        color: #666;
+        font-style: italic;
+        display: inline-block;
+        min-width: 7em;
+      }
+      .progress {
+        margin-top: 1rem;
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+      }
+      .progress-step {
+        padding: 0.4rem 0.8rem;
+        border-radius: 6px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        background: #16213e;
+        color: #555;
+        border: 1px solid #333;
+        transition: all 0.2s;
+      }
+      .progress-step.active {
+        color: #e94560;
+        border-color: #e94560;
+        animation: pulse-border 1s ease-in-out infinite;
+      }
+      .progress-step.done {
+        color: #7bed9f;
+        border-color: #7bed9f;
+      }
+      .progress-step.error {
+        color: #e94560;
+        border-color: #e94560;
+      }
+      @keyframes pulse-border {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+      }
+      .input-tabs {
+        display: flex;
+        gap: 0;
+        margin-bottom: 0;
+      }
+      .tab {
+        padding: 0.5rem 1.25rem;
+        border: 1px solid #333;
+        border-bottom: none;
+        background: #0f1a2e;
+        color: #888;
+        cursor: pointer;
+        font-size: 0.85rem;
+        font-weight: 600;
+        border-radius: 8px 8px 0 0;
+      }
+      .tab.active {
+        background: #16213e;
+        color: #eee;
+        border-color: #333;
+      }
+      #input-text textarea, .drop-zone {
+        border-radius: 0 8px 8px 8px;
+      }
+      .drop-zone {
+        width: 100%;
+        min-height: 180px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: #16213e;
+        border: 2px dashed #333;
+        color: #888;
+        cursor: pointer;
+        transition: border-color 0.2s, background 0.2s;
+        position: relative;
+      }
+      .drop-zone.dragover {
+        border-color: #e94560;
+        background: rgba(233, 69, 96, 0.05);
+      }
+      .drop-zone input[type="file"] {
+        position: absolute;
+        inset: 0;
+        opacity: 0;
+        cursor: pointer;
+      }
+      .drop-zone p { pointer-events: none; font-size: 0.9rem; }
+      .file-info {
+        margin-top: 0.75rem;
+        padding: 0.5rem 0.75rem;
+        background: #16213e;
+        border-radius: 6px;
+        font-size: 0.85rem;
+        color: #aaa;
+      }
+      .file-info strong { color: #eee; }
+      @media (max-width: 640px) {
+        .results { grid-template-columns: 1fr; }
+        h1 { font-size: 1.2rem; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <h1>Compression Benchmark: Brotli vs Gzip</h1>
+      <span class="badge badge-wasm">WASM-powered</span>
+      <span id="wasm-status" class="badge badge-status">Loading WASM...</span>
+    </div>
+    <p class="desc">
+      Type or paste text below to compare compression algorithms in real time.
+      Gzip runs via the browser's built-in CompressionStream API.
+      Brotli runs via Rust compiled to WebAssembly.
+    </p>
+
+    <%= @inner_content %>
+
+    <div class="input-tabs">
+      <button id="tab-text" class="tab active" onclick="switchTab('text')">Text Input</button>
+      <button id="tab-file" class="tab" onclick="switchTab('file')">File Input</button>
+    </div>
+
+    <div id="input-text">
+      <textarea id="text-input"></textarea>
+    </div>
+
+    <div id="input-file" style="display:none">
+      <div id="drop-zone" class="drop-zone">
+        <p>Drop a file here or click to select</p>
+        <input type="file" id="file-input" />
+      </div>
+      <div id="file-info" class="file-info" style="display:none"></div>
+    </div>
+
+    <div class="controls-row">
+      <div class="original-size">
+        Original size: <span id="original-size">0 bytes</span>
+      </div>
+      <div class="quality-control">
+        <label for="quality-slider">Brotli quality:</label>
+        <input type="range" id="quality-slider" min="0" max="11" value="4" />
+        <span id="quality-value">4</span>
+        <span class="quality-hint" id="quality-hint">balanced</span>
+      </div>
+    </div>
+
+    <div id="progress" class="progress" style="display:none">
+      <div class="progress-step" id="step-read">Reading file...</div>
+      <div class="progress-step" id="step-gzip">Gzip: waiting</div>
+      <div class="progress-step" id="step-brotli">Brotli: waiting</div>
+    </div>
+
+    <div class="results">
+      <div class="panel panel-gzip">
+        <h3>Gzip (JavaScript)</h3>
+        <div class="subtitle">CompressionStream API</div>
+        <div id="gzip-results">
+          <p class="placeholder">Enter text above to see results</p>
+        </div>
+      </div>
+
+      <div class="panel panel-brotli">
+        <h3>Brotli (WASM)</h3>
+        <div class="subtitle">Rust brotli crate via Exclosured</div>
+        <div id="brotli-results">
+          <p class="placeholder">Enter text above to see results</p>
+        </div>
+      </div>
+    </div>
+
+    <div id="winner" class="winner"></div>
+
+    <div class="note">
+      <strong>Why does this matter?</strong> Brotli compression is
+      <strong>not available</strong> in browser JavaScript. The
+      <code>CompressionStream</code> API only supports <code>gzip</code>
+      and <code>deflate</code>. This demo uses Rust's
+      <code>brotli</code> crate compiled to WebAssembly via
+      <strong>Exclosured</strong>, bringing a capability to the browser
+      that is otherwise impossible with pure JS.
+    </div>
+
+    <script defer phx-track-static src={"/assets/app.js"}></script>
+  </body>
+</html>
