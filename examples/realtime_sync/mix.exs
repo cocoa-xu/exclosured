@@ -8,6 +8,7 @@ defmodule RealtimeSync.MixProject do
       elixir: "~> 1.15",
       compilers: [:exclosured] ++ Mix.compilers(),
       start_permanent: Mix.env() == :prod,
+      aliases: aliases(),
       deps: deps()
     ]
   end
@@ -17,6 +18,10 @@ defmodule RealtimeSync.MixProject do
       mod: {RealtimeSync.Application, []},
       extra_applications: [:logger, :runtime_tools]
     ]
+  end
+
+  defp aliases do
+    [setup: ["deps.get"]]
   end
 
   defp deps do
