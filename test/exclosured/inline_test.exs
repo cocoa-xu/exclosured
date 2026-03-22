@@ -43,13 +43,13 @@ defmodule Exclosured.InlineTest do
   # Test one-liner syntax (defwasm/2) with plain string
   defmodule TestOneLiner do
     use Exclosured.Inline
-    defwasm :add, args: [a: :i32, b: :i32], do: "return a + b;"
+    defwasm(:add, args: [a: :i32, b: :i32], do: "return a + b;")
   end
 
   # Test one-liner with ~RUST sigil
   defmodule TestOneLinerRust do
     use Exclosured.Inline
-    defwasm :multiply, args: [a: :i32, b: :i32], do: ~RUST"return a * b;"
+    defwasm(:multiply, args: [a: :i32, b: :i32], do: ~RUST"return a * b;")
   end
 
   describe "defwasm macro" do
@@ -107,6 +107,7 @@ defmodule Exclosured.InlineTest do
       let x = 1;
       let y = 2;
       """
+
       assert result == "let x = 1;\nlet y = 2;\n"
     end
   end
