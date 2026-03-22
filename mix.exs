@@ -24,12 +24,18 @@ defmodule Exclosured.MixProject do
 
   defp deps do
     [
+      {:telemetry, "~> 1.0"},
+
+      # Optional: LiveView integration (call, sync, stream_call, sandbox component)
       {:phoenix, "~> 1.7", optional: true},
       {:phoenix_live_view, "~> 1.0", optional: true},
-      {:jason, "~> 1.0"},
-      {:telemetry, "~> 1.0"},
+      {:jason, "~> 1.0", optional: true},
+
+      # dev only
       {:file_system, "~> 1.0", only: :dev, optional: true},
-      {:ex_doc, "~> 0.34", only: :dev, runtime: false}
+
+      # docs only
+      {:ex_doc, "~> 0.34", only: :docs, runtime: false}
     ]
   end
 
@@ -41,7 +47,15 @@ defmodule Exclosured.MixProject do
     [
       licenses: ["MIT"],
       links: %{"GitHub" => "https://github.com/cocoa-xu/exclosured"},
-      files: ~w(lib priv native/exclosured_guest mix.exs README.md LICENSE)
+      files: ~w(
+        lib
+        priv/static/exclosured.js
+        priv/static/exclosured_hook.js
+        mix.exs
+        README.md
+        LICENSE
+        CHANGELOG.md
+      )
     ]
   end
 

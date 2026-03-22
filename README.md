@@ -99,7 +99,26 @@ end
 # MyApp.Events.ProgressEvent.from_payload(payload) => %ProgressEvent{percent: 75, stage: "done"}
 ```
 
-**Telemetry.** Every WASM call, emit, error, and compilation emits `:telemetry` events. Plug into LiveDashboard or any monitoring tool.
+**Telemetry.** Every WASM operation emits `:telemetry` events. Plug into LiveDashboard or any monitoring tool.
+
+| Event | Measurements | Metadata |
+|---|---|---|
+| `[:exclosured, :compile, :start]` | `system_time` | `module` |
+| `[:exclosured, :compile, :stop]` | `duration` | `module`, `wasm_size` |
+| `[:exclosured, :compile, :error]` | `duration` | `module`, `error` |
+| `[:exclosured, :wasm, :call]` | | `module`, `func` |
+| `[:exclosured, :wasm, :result]` | | `module`, `func` |
+| `[:exclosured, :wasm, :emit]` | | `module`, `event` |
+| `[:exclosured, :wasm, :error]` | | `module`, `func`, `error` |
+| `[:exclosured, :wasm, :ready]` | | `module` |
+
+```elixir
+:telemetry.attach_many("my-handler",
+  [[:exclosured, :compile, :stop], [:exclosured, :wasm, :call]],
+  fn event, measurements, metadata, _ ->
+    Logger.info("[exclosured] #{inspect(event)} #{inspect(metadata)}")
+  end, nil)
+```
 
 ## Prerequisites
 
