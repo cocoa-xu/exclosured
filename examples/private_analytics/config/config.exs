@@ -33,7 +33,8 @@ config :esbuild,
 
 config :exclosured,
   modules: [
-    private_analytics_wasm: []
+    private_analytics_wasm: [],
+    rust_hook: []
   ]
 
 config :logger, level: :info

@@ -79,7 +79,8 @@ defmodule Exclosured.Inline do
         unquote(name),
         unquote(Keyword.get(opts, :args, [])),
         unquote(Keyword.get(opts, :return, :i32)),
-        unquote(rust_code)
+        unquote(rust_code),
+        unquote(Keyword.get(opts, :deps, []))
       }
     end
   end
@@ -94,7 +95,7 @@ defmodule Exclosured.Inline do
 
     # Generate Elixir bindings
     fn_defs =
-      for {name, args, _ret, _rust} <- functions do
+      for {name, args, _ret, _rust, _deps} <- functions do
         arg_names = Keyword.keys(args)
         arg_vars = Enum.map(arg_names, &Macro.var(&1, nil))
 
@@ -127,7 +128,7 @@ defmodule Exclosured.Inline do
 
         @doc "List of exported WASM function names."
         def wasm_exports do
-          unquote(Enum.map(functions, fn {name, _, _, _} -> name end))
+          unquote(Enum.map(functions, fn {name, _, _, _, _} -> name end))
         end
       end
 
@@ -147,6 +148,17 @@ defmodule Exclosured.Inline do
     src_dir = Path.join(crate_dir, "src")
     File.mkdir_p!(src_dir)
 
+    # Collect extra deps from all functions
+    extra_deps =
+      functions
+      |> Enum.flat_map(fn {_, _, _, _, deps} -> deps end)
+      |> Enum.uniq_by(fn {name, _} -> name end)
+
+    extra_deps_toml =
+      Enum.map_join(extra_deps, "\n", fn {name, version} ->
+        "#{name} = \"#{version}\""
+      end)
+
     # Write Cargo.toml
     File.write!(Path.join(crate_dir, "Cargo.toml"), """
     [package]
@@ -159,6 +171,7 @@ defmodule Exclosured.Inline do
 
     [dependencies]
     wasm-bindgen = "0.2"
+    #{extra_deps_toml}
 
     [profile.release]
     opt-level = "z"
@@ -238,7 +251,7 @@ defmodule Exclosured.Inline do
   defp generate_lib_rs(functions) do
     fn_code =
       functions
-      |> Enum.map(fn {name, args, _ret, rust_code} ->
+      |> Enum.map(fn {name, args, _ret, rust_code, _deps} ->
         {params, setup} = build_ffi(args)
 
         """

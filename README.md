@@ -225,6 +225,29 @@ Password strength checker and SSN validator that process sensitive data entirely
 
 Drag brightness/contrast sliders on an image. Toggle between server roundtrip mode and local WASM mode to feel the difference.
 
+### Example 10: Private Analytics (E2E Encrypted Data Room)
+
+**Run it:** `cd examples/private_analytics && mix deps.get && mix compile && mix phx.server` (port 4011)
+
+The most comprehensive demo. A multi-user analytics room where one user loads a dataset into DuckDB-WASM, runs SQL queries, and shares encrypted results with other users in real-time. The server is a blind relay.
+
+This demo showcases nearly every Exclosured feature:
+
+| Feature | How it's used |
+|---|---|
+| **E2E encryption** | AES-256-GCM in Rust WASM (`aes-gcm` crate). Key in URL fragment, never sent to server. |
+| **DuckDB-WASM** | Full SQL engine running in the browser. Parquet and CSV support. |
+| **LiveView hook in Rust** | SQL editor (highlighting, input, scroll sync) is a Rust `SqlEditorHook` via `web-sys`. |
+| **PII masking** | Owner selects columns to mask. Rust WASM scans for email/phone/SSN/CC patterns. Viewers see masked data. |
+| **Histogram + profiling** | Each user runs column analysis locally in their own WASM. Canvas2D rendering via `web-sys`. |
+| **Cursor presence** | Multi-user hover indicators with color-coded dots, click-to-pin, off-page banners. |
+| **Live SQL sync** | Editors see each other's SQL in real-time via PubSub. Rust hook updates textarea + highlighting. |
+| **`defwasm` with `deps:`** | Maud crate for compile-time HTML generation in inline WASM functions. |
+| **Role-based access** | Cryptographic tokens in URL fragments. Server verifies via SHA-256 hashes. |
+| **Dual themes** | Light and dark mode with CSS variables. |
+
+Architecture: two WASM crates (`private_analytics_wasm` for crypto, `rust_hook` with 6 Rust modules for all UI logic), a thin JS coordinator (~1000 lines, down from 1735), Room GenServer with rate limiting, and Phoenix LiveView for the UI shell.
+
 ---
 
 ## Architecture
@@ -305,20 +328,80 @@ The macro:
 4. Generates Elixir bindings (`MyApp.Crypto.wasm_url()`, etc.)
 5. Only recompiles when the Rust source changes
 
+### External Crate Dependencies
+
+Use the `deps:` option to pull in any crate from crates.io:
+
+```elixir
+defmodule MyApp.HtmlRenderer do
+  use Exclosured.Inline
+
+  defwasm :render_card, args: [data: :binary], deps: [maud: "0.26"] do
+    ~S"""
+    use maud::html;
+
+    let markup = html! {
+        div class="card" {
+            h3 { (title) }
+            p { (description) }
+        }
+    };
+    let bytes = markup.into_string().into_bytes();
+    let n = bytes.len().min(data.len());
+    data[..n].copy_from_slice(&bytes[..n]);
+    return n as i32;
+    """
+  end
+end
+```
+
+[Maud](https://maud.lambda.xyz/) validates HTML structure at Rust compile time and auto-escapes all interpolated values. Any pure-Rust crate that compiles to wasm32 works: `serde`, `regex`, `chrono`, `image`, etc.
+
+### LiveView Hooks in Rust
+
+You can write Phoenix LiveView hooks entirely in Rust/WASM. The hook lifecycle (`mounted`, `updated`, `destroyed`) maps to Rust methods. DOM access via `web-sys`. Events via a `pushEvent` callback injected from JS:
+
+```rust
+#[wasm_bindgen]
+pub struct MyHook {
+    el: HtmlElement,
+    push_event: js_sys::Function,
+}
+
+#[wasm_bindgen]
+impl MyHook {
+    #[wasm_bindgen(constructor)]
+    pub fn new(el: HtmlElement, push_event: js_sys::Function) -> Self { ... }
+    pub fn mounted(&mut self) { /* DOM setup, event listeners */ }
+    pub fn on_event(&self, event: &str, payload: &str) { /* handle server events */ }
+}
+```
+
+```javascript
+// JS is just a thin shim (10 lines):
+const mod = await import("/wasm/my_hook/my_hook.js");
+await mod.default("/wasm/my_hook/my_hook_bg.wasm");
+this._hook = new mod.MyHook(this.el, (e, p) => this.pushEvent(e, p));
+this._hook.mounted();
+```
+
+The Private Analytics demo uses this pattern: the SQL editor (syntax highlighting, input handling, scroll sync, keyboard shortcuts) is a Rust LiveView hook with zero JS logic.
+
 ## Inline vs Full Workspace
 
 Exclosured supports two ways to write WASM modules. Use whichever fits the task.
 
-**Inline `defwasm`**: for leaf functions where the Cargo setup would be more code than the logic itself. Zero ceremony, tiny binaries, type declarations drive all FFI boilerplate. No external crate access, no persistent state.
+**Inline `defwasm`**: for leaf functions where the Cargo setup would be more code than the logic itself. Zero ceremony, tiny binaries, type declarations drive all FFI boilerplate. Supports external crates via the `deps:` option. No persistent state.
 
 **Full Cargo workspace**: for anything substantial. Full crates.io ecosystem, multi-file Rust projects, `cargo test`, rust-analyzer support, `web-sys` for Canvas/WebGPU access, persistent state with `thread_local!`, shared library crates across modules.
 
 | | Inline `defwasm` | Full workspace |
 |---|---|---|
 | Lines of Rust | < 50 | Any size |
-| External crates | No | Yes |
+| External crates | Yes (via `deps:`) | Yes |
 | Browser APIs (web-sys) | No | Yes |
 | Persistent state | No | Yes |
+| LiveView hooks in Rust | No | Yes |
 | Rust testing | No | `cargo test` |
 | IDE support | String in Elixir | Full rust-analyzer |
 | Setup cost | Zero | Cargo workspace |

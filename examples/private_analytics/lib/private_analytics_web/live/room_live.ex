@@ -124,6 +124,11 @@ defmodule PrivateAnalyticsWeb.RoomLive do
 
   @impl true
   def handle_event("update_sql", %{"value" => sql}, socket) do
+    # Broadcast SQL changes to all other users for live sync
+    if socket.assigns.role in [:owner, :editor] do
+      Room.broadcast_sql(socket.assigns.room_id, self(), sql)
+    end
+
     {:noreply, assign(socket, sql: sql)}
   end
 
@@ -241,6 +246,16 @@ defmodule PrivateAnalyticsWeb.RoomLive do
   @impl true
   def handle_info({:cursor_update, cursors}, socket) do
     {:noreply, push_event(socket, "cursor_update", %{cursors: cursors})}
+  end
+
+  @impl true
+  def handle_info({:sql_sync, sql}, socket) do
+    socket =
+      socket
+      |> assign(sql: sql)
+      |> push_event("sync_sql", %{sql: sql})
+
+    {:noreply, socket}
   end
 
   @impl true

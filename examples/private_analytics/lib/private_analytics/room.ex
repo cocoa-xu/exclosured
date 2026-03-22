@@ -69,6 +69,13 @@ defmodule PrivateAnalytics.Room do
     end
   end
 
+  def broadcast_sql(room_id, from_pid, sql) do
+    case lookup(room_id) do
+      {:ok, room_pid} -> GenServer.cast(room_pid, {:broadcast_sql, from_pid, sql})
+      :error -> :ok
+    end
+  end
+
   def broadcast_pii_config(room_id, columns) do
     case lookup(room_id) do
       {:ok, room_pid} -> GenServer.cast(room_pid, {:broadcast_pii_config, columns})
@@ -272,6 +279,20 @@ defmodule PrivateAnalytics.Room do
 
     Enum.each(all_pids, fn pid ->
       send(pid, {:pii_config_changed, columns})
+    end)
+
+    {:noreply, state}
+  end
+
+  @impl true
+  def handle_cast({:broadcast_sql, from_pid, sql}, state) do
+    # Send SQL to everyone except the sender (live editor sync)
+    all_pids = [state.owner_pid | Map.keys(state.viewers)] |> Enum.reject(&is_nil/1)
+
+    Enum.each(all_pids, fn pid ->
+      if pid != from_pid do
+        send(pid, {:sql_sync, sql})
+      end
     end)
 
     {:noreply, state}
