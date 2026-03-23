@@ -62,7 +62,7 @@ defmodule Exclosured.MixProject do
   defp docs do
     [
       main: "Exclosured",
-      extras: ["README.md"]
+      extras: ["README.md", "CHANGELOG.md", "DEVELOPER.md"]
     ]
   end
 end
