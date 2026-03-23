@@ -51,7 +51,8 @@ defmodule Exclosured.Config do
           lib: Keyword.get(opts, :lib, false),
           canvas: Keyword.get(opts, :canvas, false),
           features: Keyword.get(opts, :features, []),
-          subscribe: Keyword.get(opts, :subscribe, [])
+          subscribe: Keyword.get(opts, :subscribe, []),
+          env: Keyword.get(opts, :env, [])
         }
 
       name when is_atom(name) ->
@@ -60,7 +61,8 @@ defmodule Exclosured.Config do
           lib: false,
           canvas: false,
           features: [],
-          subscribe: []
+          subscribe: [],
+          env: []
         }
     end)
   end

@@ -126,10 +126,14 @@ defmodule Exclosured.Compiler do
 
     Logger.info("Compiling WASM module: #{name}")
 
+    env =
+      [{"CARGO_TARGET_DIR", cargo_target_dir(config)}] ++
+        Enum.map(module_config.env, fn {k, v} -> {to_string(k), to_string(v)} end)
+
     case System.cmd("cargo", args,
            stderr_to_stdout: true,
            into: IO.stream(:stdio, :line),
-           env: [{"CARGO_TARGET_DIR", cargo_target_dir(config)}]
+           env: env
          ) do
       {_, 0} ->
         :ok
