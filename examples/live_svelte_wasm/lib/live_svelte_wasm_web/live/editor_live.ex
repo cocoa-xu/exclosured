@@ -74,9 +74,5 @@ defmodule LiveSvelteWasmWeb.EditorLive do
   end
 
   @impl true
-  def handle_event("update_markdown", %{"text" => text}, socket) do
-    {:noreply, assign(socket, markdown: text)}
-  end
-
   def handle_event(_, _, socket), do: {:noreply, socket}
 end

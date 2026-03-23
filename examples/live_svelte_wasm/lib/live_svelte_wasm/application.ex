@@ -5,6 +5,8 @@ defmodule LiveSvelteWasm.Application do
   def start(_type, _args) do
     children = [
       {Phoenix.PubSub, name: LiveSvelteWasm.PubSub},
+      {Registry, keys: :unique, name: LiveSvelteWasm.RoomRegistry},
+      {DynamicSupervisor, name: LiveSvelteWasm.RoomSupervisor, strategy: :one_for_one},
       LiveSvelteWasmWeb.Endpoint
     ]
 

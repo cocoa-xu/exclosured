@@ -70,6 +70,10 @@
     <header>
       <h1>Markdown Editor</h1>
       <span class="badge">WASM + KaTeX</span>
+      <nav style="margin-left: auto; display: flex; gap: 0.75rem; font-size: 0.85rem;">
+        <a href="/" style="color: #8b949e; text-decoration: none;">Local</a>
+        <a href="/collab/demo" style="color: #58a6ff; text-decoration: none;">Collab</a>
+      </nav>
     </header>
     <%= @inner_content %>
     <script defer phx-track-static src={"/assets/app.js"}></script>

@@ -5,10 +5,12 @@ import { getHooks } from "live_svelte";
 
 // Import Svelte components explicitly (esbuild does not support import.meta.glob)
 import MarkdownEditor from "../svelte/MarkdownEditor.svelte";
+import CollabEditor from "../svelte/CollabEditor.svelte";
 
 // Build the components map for LiveSvelte
 const components = {
   MarkdownEditor,
+  CollabEditor,
 };
 
 let hooks = getHooks(components);

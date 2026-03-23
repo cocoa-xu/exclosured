@@ -15,5 +15,6 @@ defmodule LiveSvelteWasmWeb.Router do
   scope "/", LiveSvelteWasmWeb do
     pipe_through :browser
     live "/", EditorLive
+    live "/collab/:room", CollabLive
   end
 end

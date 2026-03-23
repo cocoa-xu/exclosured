@@ -1,24 +1,31 @@
 <script>
-  export let markdown = "";
-  export let live; void live; // LiveSvelte injects this prop
+  export let initial_doc = "";
+  export let initial_version = 0;
+  export let client_id = ""; void client_id; // passed from LiveView for OT identity
+  export let room_id = "";
+  export let live;
 
+  import { onMount, tick } from "svelte";
+  import { OTClient, fromDiff, transformCursor } from "../js/ot.js";
+
+  const WASM_MODULE = "live_svelte_wasm_web_markdown";
+
+  let markdown = initial_doc;
+  let prevMarkdown = initial_doc;
   let htmlPreview = "";
   let wasmMod = null;
   let wasmReady = false;
   let wasmTimeMs = 0;
   let katexTimeMs = 0;
   let previewEl;
+  let textareaEl;
+  let katexReady = false;
+  let otClient = null;
+  let suppressNextInput = false;
 
-  import { onMount, tick } from "svelte";
-
-  // WASM module name derived from LiveSvelteWasmWeb.Markdown
-  const WASM_MODULE = "live_svelte_wasm_web_markdown";
-
-  // Wait for KaTeX scripts (loaded with defer) to be available
   function waitForKatex() {
     return new Promise((resolve) => {
       if (window.renderMathInElement) return resolve();
-      // Poll until the defer scripts finish loading
       const check = setInterval(() => {
         if (window.renderMathInElement) {
           clearInterval(check);
@@ -28,10 +35,7 @@
     });
   }
 
-  let katexReady = false;
-
   onMount(async () => {
-    // Load WASM and KaTeX in parallel
     const wasmPromise = (async () => {
       const mod = await import(`/wasm/${WASM_MODULE}/${WASM_MODULE}.js`);
       return await mod.default(`/wasm/${WASM_MODULE}/${WASM_MODULE}_bg.wasm`);
@@ -49,7 +53,52 @@
     await katexPromise;
     katexReady = true;
 
-    // Render initial content now that both are ready
+    // Initialize OT client
+    otClient = new OTClient(initial_doc, initial_version, (version, op) => {
+      if (live) {
+        live.pushEvent("submit_op", { version, op });
+      }
+    });
+
+    // When a remote op is applied, update the textarea
+    otClient.onRemoteOp = (op) => {
+      const cursorPos = textareaEl ? textareaEl.selectionStart : 0;
+      const cursorEnd = textareaEl ? textareaEl.selectionEnd : 0;
+
+      markdown = otClient.doc;
+      prevMarkdown = markdown;
+
+      // Adjust cursor for the remote edit
+      tick().then(() => {
+        if (textareaEl) {
+          const newStart = transformCursor(cursorPos, op);
+          const newEnd = transformCursor(cursorEnd, op);
+          textareaEl.selectionStart = newStart;
+          textareaEl.selectionEnd = newEnd;
+        }
+      });
+    };
+
+    otClient.onResync = (doc) => {
+      markdown = doc;
+      prevMarkdown = doc;
+    };
+
+    // Listen for server events
+    if (live) {
+      live.handleEvent("ot:ack", ({ version }) => {
+        if (otClient) otClient.serverAck(version);
+      });
+
+      live.handleEvent("ot:remote_op", ({ version, op }) => {
+        if (otClient) otClient.applyServer(op);
+      });
+
+      live.handleEvent("ot:resync", ({ doc, version }) => {
+        if (otClient) otClient.resync(doc, version);
+      });
+    }
+
     if (wasmReady) updatePreview();
   });
 
@@ -63,25 +112,16 @@
 
     const encoder = new TextEncoder();
     const inputBytes = encoder.encode(markdown);
-
-    // Allocate a buffer large enough for the HTML output.
-    // HTML is typically larger than the markdown source.
     const bufSize = Math.max(inputBytes.length * 4, 4096);
     const ptr = wasmMod.alloc(bufSize);
 
-    // Zero buffer (alloc returns uninitialized memory), then copy input
     const mem = new Uint8Array(wasmMod.memory.buffer, ptr, bufSize);
     mem.fill(0);
     mem.set(inputBytes);
 
-    // Call parse_markdown(ptr, bufSize)
-    // The WASM function receives (ptr, len) where len is the full buffer size.
-    // It reads the actual markdown by trimming trailing null bytes,
-    // parses it, writes HTML back into the buffer, and returns the HTML length.
     const resultLen = wasmMod.parse_markdown(ptr, bufSize);
 
     if (resultLen >= 0) {
-      // Read the HTML output from WASM memory
       const resultBytes = new Uint8Array(wasmMod.memory.buffer, ptr, resultLen);
       htmlPreview = new TextDecoder().decode(resultBytes);
     } else {
@@ -89,10 +129,8 @@
     }
 
     wasmMod.dealloc(ptr, bufSize);
-
     wasmTimeMs = Math.round(performance.now() - start);
 
-    // After Svelte updates the DOM, render math with KaTeX
     tick().then(() => {
       if (previewEl && window.renderMathInElement) {
         const katexStart = performance.now();
@@ -110,14 +148,21 @@
     });
   }
 
-  // Re-parse whenever markdown changes (only after WASM is loaded)
   $: if (wasmMod) {
     markdown;
     updatePreview();
   }
 
   function onInput() {
-    // Local-only mode: WASM preview updates reactively, no server sync
+    if (!otClient) return;
+
+    const newText = markdown;
+    const op = fromDiff(prevMarkdown, newText);
+
+    if (op.length > 0) {
+      otClient.applyLocal(op);
+      prevMarkdown = newText;
+    }
   }
 </script>
 
@@ -125,9 +170,15 @@
   <div class="editor-pane">
     <div class="pane-header">
       <span class="pane-title">Markdown</span>
+      <span class="room-badge">Room: {room_id}</span>
       <span class="char-count">{markdown.length} chars</span>
     </div>
-    <textarea oninput={onInput} bind:value={markdown} spellcheck="false"></textarea>
+    <textarea
+      bind:this={textareaEl}
+      oninput={onInput}
+      bind:value={markdown}
+      spellcheck="false"
+    ></textarea>
   </div>
   <div class="divider"></div>
   <div class="preview-pane">
@@ -173,6 +224,7 @@
     border-bottom: 1px solid #21262d;
     font-size: 0.8rem;
     flex-shrink: 0;
+    gap: 0.5rem;
   }
 
   .pane-title {
@@ -182,9 +234,19 @@
     letter-spacing: 0.05em;
   }
 
+  .room-badge {
+    color: #d29922;
+    font-size: 0.75rem;
+    font-family: monospace;
+    background: #d2992220;
+    padding: 0.1rem 0.4rem;
+    border-radius: 4px;
+  }
+
   .char-count {
     color: #484f58;
     font-size: 0.75rem;
+    margin-left: auto;
   }
 
   .wasm-badge {
