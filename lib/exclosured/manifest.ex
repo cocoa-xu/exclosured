@@ -73,14 +73,20 @@ defmodule Exclosured.Manifest do
   defp module_stale?(module_config, config, manifest) do
     name = Atom.to_string(module_config.name)
     source_dir = Path.join(config.source_dir, name)
+    output_dir = Path.join(config.output_dir, name)
+
+    # Check if output files exist (handles fresh clone where manifest
+    # exists in _build but priv/static/wasm is gitignored)
+    output_exists =
+      File.dir?(output_dir) and
+        output_dir |> Path.join("*.wasm") |> Path.wildcard() |> Enum.any?()
 
     case Map.get(manifest, module_config.name) do
       nil ->
         true
 
       %{mtimes: old_mtimes} ->
-        current_mtimes = collect_mtimes(source_dir)
-        current_mtimes != old_mtimes
+        not output_exists or collect_mtimes(source_dir) != old_mtimes
     end
   end
 
