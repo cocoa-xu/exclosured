@@ -253,10 +253,13 @@ defmodule Exclosured.Inline do
     rust_source = generate_lib_rs(functions)
     lib_rs_path = Path.join(src_dir, "lib.rs")
 
-    # Only recompile if source changed
+    # Recompile if source changed OR output files are missing
+    out_dir = Path.expand(Path.join(output_dir, module_name))
+    bg_wasm = Path.join(out_dir, "#{module_name}_bg.wasm")
+
     needs_compile =
       case File.read(lib_rs_path) do
-        {:ok, existing} -> existing != rust_source
+        {:ok, existing} -> existing != rust_source or not File.exists?(bg_wasm)
         _ -> true
       end
 

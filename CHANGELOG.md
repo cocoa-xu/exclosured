@@ -10,6 +10,14 @@ This project publishes to three registries. Version bumps are kept in sync.
 | [npmjs.com](https://www.npmjs.com/package/exclosured) | `exclosured` (JS LiveView hook) |
 | [crates.io](https://crates.io/crates/exclosured_guest) | `exclosured_guest` (Rust guest crate) |
 
+## 0.1.2
+
+### hex.pm (exclosured@0.1.2)
+
+- Fixed: inline WASM compiler now checks if output files exist, not just
+  if the Rust source is unchanged. Prevents skipping compilation when a
+  previous build was interrupted (e.g., by a concurrent download failure).
+
 ## 0.1.1
 
 ### hex.pm (exclosured@0.1.1)
