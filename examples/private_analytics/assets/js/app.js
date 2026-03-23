@@ -59,12 +59,12 @@ function renderTable(tableEl, emptyEl, columns, rows, rustHook, onReorder) {
       JSON.stringify(columns), JSON.stringify(rows), 1, rows.length
     )
   } else {
-    let html = "<thead><tr><th class=\"row-num\">#</th>"
+    let html = "<thead><tr><th class=\"cursor-header\"></th>"
     for (const col of columns) html += `<th>${escapeHTML(col)}</th>`
     html += "</tr></thead><tbody>"
     for (let r = 0; r < rows.length; r++) {
       const row = rows[r]
-      html += `<tr><td class="row-num">${r + 1}</td>`
+      html += `<tr><td class="cursor-cell"></td>`
       for (const col of columns) {
         const raw = row[col] !== undefined ? row[col] : null
         html += `<td>${escapeHTML(raw != null ? String(raw) : "")}</td>`
@@ -726,7 +726,7 @@ Hooks.RoomHook = {
       for (const [rowIdx, cursors] of Object.entries(byRow)) {
         const tr = trs[parseInt(rowIdx)]; if (!tr) continue
         tr.classList.add("has-cursors")
-        const cell = tr.querySelector("td.row-num") || tr.querySelector("td:first-child"); if (!cell) continue
+        const cell = tr.querySelector("td.cursor-cell") || tr.querySelector("td:first-child"); if (!cell) continue
         const container = document.createElement("div")
         container.className = "cursor-indicators"
         container.setAttribute("data-tooltip", cursors.map(c => c.name).join(", "))
