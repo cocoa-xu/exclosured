@@ -484,21 +484,6 @@ defmodule PrivateAnalyticsWeb.RoomLive do
         </div>
       </div>
 
-      <%!-- Column Analysis section (histogram + profiling) --%>
-      <div :if={@role != :pending} class="card" id="analysis-section">
-        <div class="card-title">Column Analysis</div>
-        <div id="analysis-container" phx-update="ignore">
-          <div class="analysis-controls">
-            <select id="histogram-column" class="page-size-select">
-              <option value="">Select a column</option>
-            </select>
-            <span id="analysis-status" class="query-status"></span>
-          </div>
-          <canvas id="histogram-canvas" width="500" height="200" style="display:none;"></canvas>
-          <div id="column-stats" class="column-stats"></div>
-        </div>
-      </div>
-
       <%!-- Pagination is handled client-side (each user paginates independently) --%>
 
       <%!-- Pending state: waiting to join --%>
