@@ -81,4 +81,99 @@ defmodule Exclosured.ConfigTest do
       assert Exclosured.Config.module_config(config, :unknown) == nil
     end
   end
+
+  describe "cargo options" do
+    test "parses env option" do
+      Application.put_env(:exclosured, :modules,
+        sqlite: [
+          env: [
+            CC_wasm32_unknown_unknown: "/usr/bin/clang",
+            CFLAGS_wasm32_unknown_unknown: "--target=wasm32-wasi"
+          ]
+        ]
+      )
+
+      config = Exclosured.Config.read()
+      sqlite = Exclosured.Config.module_config(config, :sqlite)
+
+      assert sqlite.env == [
+               CC_wasm32_unknown_unknown: "/usr/bin/clang",
+               CFLAGS_wasm32_unknown_unknown: "--target=wasm32-wasi"
+             ]
+    end
+
+    test "env defaults to empty list" do
+      Application.put_env(:exclosured, :modules, my_mod: [])
+
+      config = Exclosured.Config.read()
+      mod = Exclosured.Config.module_config(config, :my_mod)
+      assert mod.env == []
+    end
+
+    test "parses no_default_features" do
+      Application.put_env(:exclosured, :modules,
+        syntect: [no_default_features: true, features: ["html", "regex-fancy"]]
+      )
+
+      config = Exclosured.Config.read()
+      mod = Exclosured.Config.module_config(config, :syntect)
+      assert mod.no_default_features == true
+      assert mod.features == ["html", "regex-fancy"]
+    end
+
+    test "no_default_features defaults to false" do
+      Application.put_env(:exclosured, :modules, my_mod: [])
+
+      config = Exclosured.Config.read()
+      mod = Exclosured.Config.module_config(config, :my_mod)
+      assert mod.no_default_features == false
+    end
+
+    test "parses cargo_args" do
+      Application.put_env(:exclosured, :modules, crypto: [cargo_args: ["--locked", "--offline"]])
+
+      config = Exclosured.Config.read()
+      mod = Exclosured.Config.module_config(config, :crypto)
+      assert mod.cargo_args == ["--locked", "--offline"]
+    end
+
+    test "cargo_args defaults to empty list" do
+      Application.put_env(:exclosured, :modules, my_mod: [])
+
+      config = Exclosured.Config.read()
+      mod = Exclosured.Config.module_config(config, :my_mod)
+      assert mod.cargo_args == []
+    end
+
+    test "all options together" do
+      Application.put_env(:exclosured, :modules,
+        sqlite: [
+          features: ["bundled"],
+          no_default_features: true,
+          env: [CC: "/usr/bin/clang"],
+          cargo_args: ["--locked"]
+        ]
+      )
+
+      config = Exclosured.Config.read()
+      mod = Exclosured.Config.module_config(config, :sqlite)
+      assert mod.features == ["bundled"]
+      assert mod.no_default_features == true
+      assert mod.env == [CC: "/usr/bin/clang"]
+      assert mod.cargo_args == ["--locked"]
+    end
+
+    test "shorthand module (atom only) gets all defaults" do
+      Application.put_env(:exclosured, :modules, simple: [])
+
+      config = Exclosured.Config.read()
+      mod = Exclosured.Config.module_config(config, :simple)
+      assert mod.features == []
+      assert mod.no_default_features == false
+      assert mod.env == []
+      assert mod.cargo_args == []
+      assert mod.lib == false
+      assert mod.canvas == false
+    end
+  end
 end

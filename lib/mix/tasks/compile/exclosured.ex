@@ -14,13 +14,33 @@ defmodule Mix.Tasks.Compile.Exclosured do
   ## Configuration
 
       config :exclosured,
-        source_dir: "native/wasm",
-        output_dir: "priv/static/wasm",
-        optimize: :none,
+        source_dir: "native/wasm",        # where Cargo.toml crates live
+        output_dir: "priv/static/wasm",   # where .wasm + .js output goes
+        optimize: :none,                  # :none | :size | :speed (wasm-opt)
         modules: [
           my_mod: [],
-          heavy_compute: [features: ["simd"]]
+          heavy_compute: [features: ["simd"]],
+          sqlite: [
+            no_default_features: true,
+            features: ["bundled"],
+            env: [CC_wasm32_unknown_unknown: "/usr/bin/clang"],
+            cargo_args: ["--locked"]
+          ]
         ]
+
+  ## Module Options
+
+  Each module accepts the following options:
+
+  - `features` - List of cargo features to enable (passed as `--features a,b,c`)
+  - `no_default_features` - If `true`, passes `--no-default-features` to cargo
+  - `env` - Keyword list of environment variables for the cargo build
+    (e.g., `[CC_wasm32_unknown_unknown: "/usr/bin/clang"]`)
+  - `cargo_args` - List of extra arguments forwarded directly to `cargo build`
+    (e.g., `["--locked", "--offline"]`)
+  - `lib` - If `true`, marks this as a library crate (not compiled standalone)
+  - `canvas` - If `true`, enables canvas integration
+  - `subscribe` - List of event subscriptions
   """
 
   use Mix.Task.Compiler

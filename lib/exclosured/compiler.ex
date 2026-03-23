@@ -124,6 +124,16 @@ defmodule Exclosured.Compiler do
         features -> args ++ ["--features", Enum.join(features, ",")]
       end
 
+    args =
+      if module_config.no_default_features do
+        args ++ ["--no-default-features"]
+      else
+        args
+      end
+
+    # Forward any extra cargo args the user specified
+    args = args ++ module_config.cargo_args
+
     Logger.info("Compiling WASM module: #{name}")
 
     env =

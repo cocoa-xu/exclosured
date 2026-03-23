@@ -51,8 +51,10 @@ defmodule Exclosured.Config do
           lib: Keyword.get(opts, :lib, false),
           canvas: Keyword.get(opts, :canvas, false),
           features: Keyword.get(opts, :features, []),
+          no_default_features: Keyword.get(opts, :no_default_features, false),
           subscribe: Keyword.get(opts, :subscribe, []),
-          env: Keyword.get(opts, :env, [])
+          env: Keyword.get(opts, :env, []),
+          cargo_args: Keyword.get(opts, :cargo_args, [])
         }
 
       name when is_atom(name) ->
@@ -61,8 +63,10 @@ defmodule Exclosured.Config do
           lib: false,
           canvas: false,
           features: [],
+          no_default_features: false,
           subscribe: [],
-          env: []
+          env: [],
+          cargo_args: []
         }
     end)
   end

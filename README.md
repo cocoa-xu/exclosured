@@ -77,8 +77,9 @@ Fifteen example applications in `examples/`, each with its own README.
 | 13 | [Kino Data Explorer](examples/kino_exclosured/) | Livebook smart cell, inline WASM calculator |
 | 14 | [**Brotli Compress**](examples/brotli_compress/) | Brotli (WASM) vs Gzip (JS) compression benchmark |
 | 15 | [**Matrix Multiply**](examples/matrix_mul/) | 5-way benchmark: JS vs WASM vs WebGPU vs TF.js vs OpenCV |
+| 16 | [**Elixir Notebook**](examples/elixir_notebook/) | Livebook-like static site: IEx + syntect highlighting + pulldown-cmark + Rust SQLite |
 
-Most demos run with `cd examples/<name> && mix setup && mix phx.server`. Some require npm setup; see each example's README.
+Most demos run with `cd examples/<name> && mix setup && mix phx.server`. Some require npm setup; see each example's README. The Elixir Notebook (16) requires `mise exec -- mix release`; see its README.
 
 ## Installation
 
@@ -139,6 +140,42 @@ config :exclosured,
     my_processor: [],                 # default options
     renderer: [canvas: true],         # auto-creates canvas in sandbox component
     shared: [lib: true]               # library crate, not compiled to .wasm
+  ]
+```
+
+#### Module options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `features` | `[]` | Cargo features to enable (`--features a,b,c`) |
+| `no_default_features` | `false` | Pass `--no-default-features` to cargo |
+| `env` | `[]` | Environment variables for the cargo build (keyword list) |
+| `cargo_args` | `[]` | Extra arguments forwarded directly to `cargo build` |
+| `lib` | `false` | Library crate (not compiled to standalone `.wasm`) |
+| `canvas` | `false` | Enable canvas integration |
+
+Example with all options (compiling SQLite C to WASM):
+
+```elixir
+config :exclosured,
+  optimize: :size,
+  modules: [
+    # Pure Rust — just works
+    highlighter: [],
+
+    # Disable default features, enable specific ones
+    syntect: [no_default_features: true, features: ["html", "regex-fancy"]],
+
+    # C code needs a cross-compiler (env vars forwarded to `cc` crate)
+    sqlite: [
+      env: [
+        CC_wasm32_unknown_unknown: "/opt/homebrew/opt/llvm/bin/clang",
+        CFLAGS_wasm32_unknown_unknown: "--target=wasm32-wasi --sysroot=..."
+      ]
+    ],
+
+    # Arbitrary extra cargo flags
+    crypto: [cargo_args: ["--locked", "--offline"]]
   ]
 ```
 
