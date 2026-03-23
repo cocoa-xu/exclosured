@@ -44,9 +44,15 @@ Every other Elixir+Rust library ([Rustler](https://github.com/rusterlium/rustler
 
 ## Resources
 
-- [Hex.pm package](https://hex.pm/packages/exclosured)
-- [npm package](https://www.npmjs.com/package/exclosured) (JS LiveView hook)
-- [crates.io](https://crates.io/crates/exclosured_guest) (Rust guest crate)
+| Package | Purpose |
+|---|---|
+| [exclosured](https://hex.pm/packages/exclosured) (Hex) | Core Elixir library |
+| [exclosured](https://www.npmjs.com/package/exclosured) (npm) | JS LiveView hook |
+| [exclosured_guest](https://crates.io/crates/exclosured_guest) (crates.io) | Rust guest crate |
+| [exclosured_precompiled](https://hex.pm/packages/exclosured_precompiled) (Hex) | Precompiled WASM distribution |
+| [exclosured-precompiled-action](https://github.com/cocoa-xu/exclosured-precompiled-action) | GitHub Action for CI precompilation |
+| [exclosured_example](https://github.com/cocoa-xu/exclosured_example) | Example library with precompilation |
+
 - [Developer Guide](DEVELOPER.md)
 - [Changelog](CHANGELOG.md)
 
@@ -352,8 +358,6 @@ end
 
 ## Deployment
 
-Make sure the Rust toolchain is available in your build environment. The WASM files are compiled during `mix compile` and placed in `priv/static/wasm/`.
-
 ### Endpoint setup
 
 Add `"wasm"` to your endpoint's `Plug.Static` `:only` list:
@@ -382,6 +386,47 @@ If your app uses Content Security Policy, add:
 ```
 script-src 'wasm-unsafe-eval';
 ```
+
+### Precompiled distribution
+
+If you are publishing a library that includes WASM modules, you can
+distribute precompiled binaries so your users don't need the Rust
+toolchain. Use [exclosured_precompiled](https://hex.pm/packages/exclosured_precompiled):
+
+```elixir
+# In your library
+defmodule MyLib.Precompiled do
+  use ExclosuredPrecompiled,
+    otp_app: :my_lib,
+    base_url: "https://github.com/user/my_lib/releases/download/v0.1.0",
+    version: "0.1.0",
+    modules: [:my_processor]
+end
+```
+
+Build, package, and upload in one workflow:
+
+```sh
+# Locally: compile from source, package into .tar.gz + .sha256
+mix exclosured_precompiled.precompile
+
+# Upload to GitHub Release
+gh release create v0.1.0 _build/precompiled/*.tar.gz _build/precompiled/*.sha256
+
+# Generate checksum file for Hex package
+mix exclosured_precompiled.checksum --local
+```
+
+Or automate with the [GitHub Action](https://github.com/cocoa-xu/exclosured-precompiled-action):
+
+```yaml
+- uses: cocoa-xu/exclosured-precompiled-action@v1
+  with:
+    project-version: ${{ github.ref_name }}
+```
+
+See the [exclosured_example](https://github.com/cocoa-xu/exclosured_example)
+repository for a complete working example with CI automation.
 
 ## License
 
