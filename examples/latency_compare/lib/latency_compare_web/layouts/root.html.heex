@@ -44,6 +44,11 @@
         color: #0a0a1a;
         font-weight: 600;
       }
+      .mode-btn:disabled {
+        opacity: 0.3;
+        cursor: not-allowed;
+      }
+      .mode-btn:disabled:hover { background: #1a1a2e; }
       .mode-btn + .mode-btn { border-left: 1px solid #333; }
 
       /* Sliders */
@@ -108,6 +113,11 @@
       .latency-bar .value.slow { color: #ff5252; }
       .latency-bar .value.none { color: #555; }
       .latency-bar .unit { font-size: 0.9rem; font-weight: 400; color: #888; }
+      .latency-bar .server-compute {
+        font-size: 0.85rem;
+        color: #00d2ff;
+        margin-top: 0.2rem;
+      }
       .latency-bar .hint {
         font-size: 0.75rem;
         color: #666;

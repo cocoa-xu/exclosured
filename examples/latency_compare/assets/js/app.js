@@ -22,7 +22,11 @@ const ExclosuredHook = {
 
 // === CompareHook ============================================================
 // Attached to the canvas container. Handles test pattern generation,
-// WASM image loading, and the two filter modes (local WASM vs server roundtrip).
+// WASM image loading, and the four filter modes:
+// - Pure JS: JavaScript pixel loop (local)
+// - WASM: Rust compiled to WASM (local)
+// - Server (Vix): libvips on server (round-trip)
+// - Server (evision): OpenCV on server (round-trip)
 
 const CompareHook = {
   mounted() {
@@ -32,6 +36,7 @@ const CompareHook = {
     this.H = this.canvas.height;
     this.wasm = null;
     this.pendingTimestamp = null;
+    this.originalImageData = null;
 
     // Register server event handler before any async work
     this.handleEvent("server:filter_result", (payload) => {
@@ -43,16 +48,20 @@ const CompareHook = {
   },
 
   async _loadWasmAndInit() {
-    // Wait for WASM to be loaded (may already be done by ExclosuredHook
-    // or we load it ourselves if ExclosuredHook is not present)
     await this._ensureWasm();
     this.pushEvent("wasm:ready", {});
 
     // Generate and render the test pattern
     this._generateTestPattern();
 
+    // Store original pixels for JS filter mode
+    this.originalImageData = this.ctx.getImageData(0, 0, this.W, this.H);
+
     // Load the test pattern pixels into WASM
     this._pushPixelsToWasm();
+
+    // Upload pixels to server for server-side filter modes
+    this._uploadToServer();
 
     // Initial render (identity filter)
     this._applyWasmFilter(0, 0);
@@ -134,6 +143,49 @@ const CompareHook = {
     this.wasm.dealloc(ptr, src.length);
   },
 
+  _uploadToServer() {
+    const bytes = this.originalImageData.data;
+    // Convert to base64 in chunks to avoid call stack overflow
+    const chunks = [];
+    for (let i = 0; i < bytes.length; i += 8192) {
+      chunks.push(
+        String.fromCharCode.apply(null, bytes.subarray(i, i + 8192))
+      );
+    }
+    const base64 = btoa(chunks.join(""));
+    this.pushEvent("upload_image", {
+      pixels: base64,
+      width: this.W,
+      height: this.H,
+    });
+  },
+
+  _applyJsFilter(brightness, contrast) {
+    // Copy original image data (never mutate the original)
+    const imgData = new ImageData(
+      new Uint8ClampedArray(this.originalImageData.data),
+      this.W,
+      this.H
+    );
+    const data = imgData.data;
+
+    // Same formula as the Rust WASM filter for fair comparison
+    const cFactor = (contrast + 100) / 100;
+    const bOffset = brightness / 100;
+
+    for (let i = 0; i < data.length; i += 4) {
+      for (let ch = 0; ch < 3; ch++) {
+        const val = data[i + ch] / 255;
+        const contrasted = (val - 0.5) * cFactor + 0.5;
+        const result = contrasted + bOffset;
+        data[i + ch] = Math.max(0, Math.min(255, Math.round(result * 255)));
+      }
+      // Alpha unchanged
+    }
+
+    this.ctx.putImageData(imgData, 0, 0);
+  },
+
   _applyWasmFilter(brightness, contrast) {
     if (!this.wasm) return;
     this.wasm.apply_filter(brightness, contrast);
@@ -150,8 +202,8 @@ const CompareHook = {
 
   _setupSliderListeners() {
     // Listen on the actual slider inputs for real-time "input" events.
-    // In WASM mode: apply filter directly (zero network).
-    // In server mode: record timestamp and let phx-change handle the server roundtrip.
+    // Local modes: apply filter directly (zero network).
+    // Server modes: record timestamp and let phx-change handle the round-trip.
     const brightnessSlider = document.getElementById("brightness-slider");
     const contrastSlider = document.getElementById("contrast-slider");
 
@@ -160,16 +212,20 @@ const CompareHook = {
       const b = parseInt(brightnessSlider.value, 10);
       const c = parseInt(contrastSlider.value, 10);
 
-      if (mode === "wasm") {
-        // Direct WASM call - no network, instant
+      if (mode === "js") {
+        const start = performance.now();
+        this._applyJsFilter(b, c);
+        const elapsed = parseFloat((performance.now() - start).toFixed(1));
+        this.pushEvent("report_latency", { ms: elapsed });
+      } else if (mode === "wasm") {
         const start = performance.now();
         this._applyWasmFilter(b, c);
-        const elapsed = Math.round(performance.now() - start);
+        const elapsed = parseFloat((performance.now() - start).toFixed(1));
         this.pushEvent("report_latency", { ms: elapsed });
       } else {
-        // Server mode: record the send timestamp.
+        // Server modes (vix, evision): record the send timestamp.
         // The phx-change on the form will fire and send to server.
-        // Server will bounce it back via server:filter_result event.
+        // Server applies filter and pushes back filtered pixels.
         this.pendingTimestamp = performance.now();
       }
     };
@@ -183,16 +239,25 @@ const CompareHook = {
   },
 
   _onServerResult(payload) {
-    // Server has bounced the slider values back to us.
-    // Apply the filter via WASM and measure the round-trip time.
-    const b = payload.brightness;
-    const c = payload.contrast;
-    this._applyWasmFilter(b, c);
+    // Server sent back filtered pixels as base64-encoded RGBA
+    const binary = atob(payload.pixels);
+    const bytes = new Uint8ClampedArray(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    const imgData = new ImageData(bytes, this.W, this.H);
+    this.ctx.putImageData(imgData, 0, 0);
 
     if (this.pendingTimestamp) {
-      const elapsed = Math.round(performance.now() - this.pendingTimestamp);
+      const roundTrip = Math.round(performance.now() - this.pendingTimestamp);
       this.pendingTimestamp = null;
-      this.pushEvent("report_latency", { ms: elapsed });
+      const serverCompute = parseFloat(
+        (payload.server_time_us / 1000).toFixed(2)
+      );
+      this.pushEvent("report_latency", {
+        ms: roundTrip,
+        server_compute_ms: serverCompute,
+      });
     }
   },
 
@@ -229,7 +294,7 @@ function hslToRgb(h, s, l) {
   ];
 }
 
-// === LiveSocket setup ===------------------------------------------------------
+// === LiveSocket setup ========================================================
 
 let csrfToken = document
   .querySelector("meta[name='csrf-token']")

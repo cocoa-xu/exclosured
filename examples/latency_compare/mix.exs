@@ -31,7 +31,9 @@ defmodule LatencyCompare.MixProject do
       {:jason, "~> 1.0"},
       {:bandit, "~> 1.0"},
       {:esbuild, "~> 0.8", runtime: Mix.env() == :dev},
-      {:exclosured, path: "../.."}
+      {:exclosured, path: "../.."},
+      {:vix, "~> 0.31"},
+      {:evision, "~> 0.2"}
     ]
   end
 end
