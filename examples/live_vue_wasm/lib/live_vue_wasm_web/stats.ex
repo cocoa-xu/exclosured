@@ -263,7 +263,7 @@ defmodule LiveVueWasmWeb.Stats do
     data[off] = b'}';
     off += 1;
 
-    return off as i32;
+    off as i32
     """
   end
 end

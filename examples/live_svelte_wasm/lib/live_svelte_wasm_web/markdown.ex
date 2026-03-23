@@ -33,7 +33,7 @@ defmodule LiveSvelteWasmWeb.Markdown do
     let bytes = html_output.as_bytes();
     let n = bytes.len().min(input.len());
     input[..n].copy_from_slice(&bytes[..n]);
-    return n as i32;
+    n as i32
     """
   end
 end

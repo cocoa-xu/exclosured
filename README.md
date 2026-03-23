@@ -151,7 +151,7 @@ Simple functions fit on one line:
 ```elixir
 defmodule MyApp.Math do
   use Exclosured.Inline
-  defwasm :add, args: [a: :i32, b: :i32], do: ~RUST"return a + b;"
+  defwasm :add, args: [a: :i32, b: :i32], do: ~RUST"a + b"
 end
 ```
 
@@ -167,7 +167,7 @@ defmodule MyApp.Crypto do
     for &byte in password.iter() {
         hash = hash.wrapping_mul(33).wrapping_add(byte as u32);
     }
-    return hash as i32;
+    hash as i32
     """
   end
 end

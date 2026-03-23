@@ -38,7 +38,7 @@ Inputs sync between all connected Livebook users.
 ```elixir
 defmodule Demo.WasmAdd do
   use Exclosured.Inline
-  defwasm :add, args: [a: :i32, b: :i32], do: "return a + b;"
+  defwasm :add, args: [a: :i32, b: :i32], do: "a + b"
 end
 
 defmodule Demo.CalcWidget do

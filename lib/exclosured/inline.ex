@@ -10,7 +10,7 @@ defmodule Exclosured.Inline do
 
       defmodule MyApp.Math do
         use Exclosured.Inline
-        defwasm :add, args: [a: :i32, b: :i32], do: ~RUST"return a + b;"
+        defwasm :add, args: [a: :i32, b: :i32], do: ~RUST"a + b"
       end
 
       defmodule MyApp.Filters do
@@ -60,7 +60,7 @@ defmodule Exclosured.Inline do
   ## Example
 
       defwasm :add, args: [a: :i32, b: :i32] do
-        ~RUST"return a + b;"
+        ~RUST"a + b"
       end
 
       defwasm :hash, args: [data: :binary] do
@@ -69,7 +69,7 @@ defmodule Exclosured.Inline do
         for &byte in data.iter() {
             hash = hash.wrapping_mul(33).wrapping_add(byte as u32);
         }
-        return hash as i32;
+        hash as i32
         \"\"\"
       end
   """
@@ -333,11 +333,9 @@ defmodule Exclosured.Inline do
 
         """
         #[no_mangle]
-        #[allow(unreachable_code)]
         pub extern "C" fn #{name}(#{params}) -> i32 {
         #{setup}
         #{indent(rust_code, 4)}
-            0
         }
         """
       end)

@@ -7,7 +7,7 @@ defmodule Exclosured.InlineTest do
 
     defwasm :add_one, args: [x: :i32] do
       """
-      let _ = x + 1;
+      x + 1
       """
     end
 
@@ -21,6 +21,7 @@ defmodule Exclosured.InlineTest do
           chunk[1] = gray;
           chunk[2] = gray;
       }
+      0
       """
     end
   end
@@ -35,7 +36,7 @@ defmodule Exclosured.InlineTest do
       for &byte in data.iter() {
           hash = hash.wrapping_mul(33).wrapping_add(byte as u32);
       }
-      return hash as i32;
+      hash as i32
       """
     end
   end
@@ -43,13 +44,13 @@ defmodule Exclosured.InlineTest do
   # Test one-liner syntax (defwasm/2) with plain string
   defmodule TestOneLiner do
     use Exclosured.Inline
-    defwasm(:add, args: [a: :i32, b: :i32], do: "return a + b;")
+    defwasm(:add, args: [a: :i32, b: :i32], do: "a + b")
   end
 
   # Test one-liner with ~RUST sigil
   defmodule TestOneLinerRust do
     use Exclosured.Inline
-    defwasm(:multiply, args: [a: :i32, b: :i32], do: ~RUST"return a * b;")
+    defwasm(:multiply, args: [a: :i32, b: :i32], do: ~RUST"a * b")
   end
 
   describe "defwasm macro" do

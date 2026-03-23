@@ -63,7 +63,7 @@ defmodule KinoExclosured.Stats do
     let result_bytes = result.as_bytes();
     let len = result_bytes.len().min(data.len());
     data[..len].copy_from_slice(&result_bytes[..len]);
-    return len as i32;
+    len as i32
     """
   end
 
@@ -127,7 +127,7 @@ defmodule KinoExclosured.Stats do
     let result_bytes = result.as_bytes();
     let len = result_bytes.len().min(data.len());
     data[..len].copy_from_slice(&result_bytes[..len]);
-    return len as i32;
+    len as i32
     """
   end
 end

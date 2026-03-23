@@ -94,7 +94,7 @@ defmodule ConfidentialComputeWeb.Validators do
     out[p] = b'}'; p += 1;
 
     input[..p].copy_from_slice(&out[..p]);
-    return p as i32;
+    p as i32
     """
   end
 
@@ -133,7 +133,7 @@ defmodule ConfidentialComputeWeb.Validators do
     }
 
     input[..p].copy_from_slice(&out[..p]);
-    return p as i32;
+    p as i32
     """
   end
 end

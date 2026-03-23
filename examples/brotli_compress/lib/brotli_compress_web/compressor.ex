@@ -37,9 +37,9 @@ defmodule BrotliCompressWeb.Compressor do
         Ok(_) => {
             let n = output.len().min(data.len());
             data[..n].copy_from_slice(&output[..n]);
-            return n as i32;
+            n as i32
         }
-        Err(_) => return -1,
+        Err(_) => -1
     }
     """
   end

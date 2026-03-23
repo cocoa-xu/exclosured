@@ -40,7 +40,7 @@ defmodule MatrixMulWeb.Multiplier do
 
     let sum: f64 = c.iter().sum();
     data[..8].copy_from_slice(&sum.to_le_bytes());
-    return 8;
+    8
     """
   end
 
@@ -71,7 +71,7 @@ defmodule MatrixMulWeb.Multiplier do
 
     let sum: f32 = c.iter().sum();
     data[..4].copy_from_slice(&sum.to_le_bytes());
-    return 4;
+    4
     """
   end
 
@@ -95,7 +95,7 @@ defmodule MatrixMulWeb.Multiplier do
     let c = a * b;
     let sum: i64 = c.iter().map(|&x| x as i64).sum();
     data[..8].copy_from_slice(&sum.to_le_bytes());
-    return 8;
+    8
     """
   end
 
@@ -119,7 +119,7 @@ defmodule MatrixMulWeb.Multiplier do
     let c = a * b;
     let sum: i64 = c.iter().map(|&x| x as i64).sum();
     data[..8].copy_from_slice(&sum.to_le_bytes());
-    return 8;
+    8
     """
   end
 
@@ -137,7 +137,7 @@ defmodule MatrixMulWeb.Multiplier do
     let c = a * b;
     let sum: i64 = c.iter().map(|&x| x as i64).sum();
     data[..8].copy_from_slice(&sum.to_le_bytes());
-    return 8;
+    8
     """
   end
 end
