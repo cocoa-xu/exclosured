@@ -46,6 +46,7 @@ const CompareHook = {
     // Wait for WASM to be loaded (may already be done by ExclosuredHook
     // or we load it ourselves if ExclosuredHook is not present)
     await this._ensureWasm();
+    this.pushEvent("wasm:ready", {});
 
     // Generate and render the test pattern
     this._generateTestPattern();
