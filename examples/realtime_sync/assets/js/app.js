@@ -44,14 +44,12 @@ const CollabEditor = {
 
   async _loadWasm() {
     try {
-      const resp = fetch("/wasm/sync_client.wasm");
-      const { instance } = await WebAssembly.instantiateStreaming(resp, {
-        env: {
-          __exclosured_emit: () => {},
-          __exclosured_broadcast: () => {},
-        },
-      });
-      this.wasm = instance.exports;
+      const name = "sync_client";
+      const mod = await import(`/wasm/${name}/${name}.js`);
+      const wasm = await mod.default(`/wasm/${name}/${name}_bg.wasm`);
+      window.__exclosured_wasm = wasm;
+      window.__exclosured_memory = wasm.memory;
+      this.wasm = wasm;
       this.wasm.init_canvas(this.W, this.H);
       // Tell server WASM is ready; server will send room state if any
       this.pushEvent("wasm:ready", {});

@@ -5,14 +5,12 @@ import { LiveSocket } from "phoenix_live_view";
 const ExclosuredHook = {
   async mounted() {
     try {
-      const url = "/wasm/confidential_compute_web_validators.wasm";
-      const response = fetch(url);
-      const { instance } = await WebAssembly.instantiateStreaming(response, {
-        env: {},
-      });
+      const name = "confidential_compute_web_validators";
+      const mod = await import(`/wasm/${name}/${name}.js`);
+      const wasm = await mod.default(`/wasm/${name}/${name}_bg.wasm`);
 
-      window.__exclosured_wasm = instance;
-      window.__exclosured_memory = instance.exports.memory;
+      window.__exclosured_wasm = wasm;
+      window.__exclosured_memory = wasm.memory;
 
       this.pushEvent("wasm:ready", {});
     } catch (err) {
@@ -38,17 +36,17 @@ const WasmPasswordHook = {
         const inputLen = encoded.length;
         const bufSize = Math.max(inputLen, 256);
 
-        const ptr = wasm.exports.alloc(bufSize);
+        const ptr = wasm.alloc(bufSize);
         const view = new Uint8Array(memory.buffer, ptr, bufSize);
         view.set(encoded);
 
-        const resultLen = wasm.exports.check_password(ptr, inputLen);
+        const resultLen = wasm.check_password(ptr, inputLen);
 
         const resultBytes = new Uint8Array(memory.buffer, ptr, resultLen);
         const resultStr = new TextDecoder().decode(resultBytes);
         const result = JSON.parse(resultStr);
 
-        wasm.exports.dealloc(ptr, bufSize);
+        wasm.dealloc(ptr, bufSize);
 
         this.pushEvent("pw_checked", {
           score: result.score,
@@ -79,17 +77,17 @@ const WasmSsnHook = {
         const inputLen = encoded.length;
         const bufSize = Math.max(inputLen, 256);
 
-        const ptr = wasm.exports.alloc(bufSize);
+        const ptr = wasm.alloc(bufSize);
         const view = new Uint8Array(memory.buffer, ptr, bufSize);
         view.set(encoded);
 
-        const resultLen = wasm.exports.mask_ssn(ptr, inputLen);
+        const resultLen = wasm.mask_ssn(ptr, inputLen);
 
         const resultBytes = new Uint8Array(memory.buffer, ptr, resultLen);
         const resultStr = new TextDecoder().decode(resultBytes);
         const result = JSON.parse(resultStr);
 
-        wasm.exports.dealloc(ptr, bufSize);
+        wasm.dealloc(ptr, bufSize);
 
         this.pushEvent("ssn_masked", {
           valid: result.valid,

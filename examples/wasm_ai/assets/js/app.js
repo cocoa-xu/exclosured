@@ -14,25 +14,13 @@ const ExclosuredHook = {
     this._name = name;
 
     try {
-      const url = `/wasm/${name}.wasm`;
-      const response = fetch(url);
-      const { instance } = await WebAssembly.instantiateStreaming(response, {
-        env: {
-          __exclosured_emit: (eventPtr, eventLen, payloadPtr, payloadLen) => {
-            const event = this._readString(eventPtr, eventLen);
-            const payload = this._readString(payloadPtr, payloadLen);
-            this.pushEvent("wasm:emit", {
-              module: name,
-              event: event,
-              payload: JSON.parse(payload),
-            });
-          },
-          __exclosured_broadcast: () => {},
-        },
-      });
+      const mod = await import(`/wasm/${name}/${name}.js`);
+      const wasm = await mod.default(`/wasm/${name}/${name}_bg.wasm`);
+      window.__exclosured_wasm = wasm;
+      window.__exclosured_memory = wasm.memory;
 
-      this.wasm = instance;
-      this.memory = instance.exports.memory;
+      this.wasm = wasm;
+      this.memory = wasm.memory;
 
       this.handleEvent("wasm:call", ({ func, args, ref }) => {
         try {
@@ -65,7 +53,7 @@ const ExclosuredHook = {
   },
 
   _callWasm(func, args) {
-    const fn_ = this.wasm.exports[func];
+    const fn_ = this.wasm[func];
     if (!fn_) throw new Error(`Function '${func}' not exported`);
 
     const wasmArgs = args.flatMap((arg) => {
@@ -88,7 +76,7 @@ const ExclosuredHook = {
   _writeString(str) {
     const encoder = new TextEncoder();
     const bytes = encoder.encode(str);
-    const ptr = this.wasm.exports.alloc(bytes.length);
+    const ptr = this.wasm.alloc(bytes.length);
     new Uint8Array(this.memory.buffer, ptr, bytes.length).set(bytes);
     return { ptr, len: bytes.length };
   },

@@ -5,14 +5,12 @@ import { LiveSocket } from "phoenix_live_view";
 const ExclosuredHook = {
   async mounted() {
     try {
-      const url = "/wasm/offload_compute_web_csv_parser.wasm";
-      const response = await fetch(url);
-      const { instance } = await WebAssembly.instantiateStreaming(response, {
-        env: {},
-      });
+      const name = "offload_compute_web_csv_parser";
+      const mod = await import(`/wasm/${name}/${name}.js`);
+      const wasm = await mod.default(`/wasm/${name}/${name}_bg.wasm`);
 
-      window.__exclosured_wasm = instance.exports;
-      window.__exclosured_memory = instance.exports.memory;
+      window.__exclosured_wasm = wasm;
+      window.__exclosured_memory = wasm.memory;
 
       this.pushEvent("wasm:ready", {});
     } catch (err) {

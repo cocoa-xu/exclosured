@@ -86,25 +86,13 @@ const RaceGame = {
 
     // Load WASM
     try {
-      const resp = fetch("/wasm/race_client.wasm");
-      const { instance } = await WebAssembly.instantiateStreaming(resp, {
-        env: {
-          __exclosured_emit: (evtPtr, evtLen, payPtr, payLen) => {
-            const evt = this._readStr(evtPtr, evtLen);
-            const pay = this._readStr(payPtr, payLen);
-            // WASM emits collision events → forward to server
-            if (evt === "collision") {
-              try {
-                const data = JSON.parse(pay);
-                this.pushEvent("player:collision", data);
-              } catch (_) {}
-            }
-          },
-          __exclosured_broadcast: () => {},
-        },
-      });
-      this.wasm = instance.exports;
-      this.memory = instance.exports.memory;
+      const name = "race_client";
+      const mod = await import(`/wasm/${name}/${name}.js`);
+      const wasm = await mod.default(`/wasm/${name}/${name}_bg.wasm`);
+      window.__exclosured_wasm = wasm;
+      window.__exclosured_memory = wasm.memory;
+      this.wasm = wasm;
+      this.memory = wasm.memory;
       this.pushEvent("wasm:ready", { module: "race_client" });
     } catch (e) {
       console.error("WASM load failed:", e);

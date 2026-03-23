@@ -8,15 +8,11 @@ import { LiveSocket } from "phoenix_live_view";
 const ExclosuredHook = {
   async mounted() {
     try {
-      const resp = fetch("/wasm/image_filter.wasm");
-      const { instance } = await WebAssembly.instantiateStreaming(resp, {
-        env: {
-          __exclosured_emit: () => {},
-          __exclosured_broadcast: () => {},
-        },
-      });
-      window.__exclosured_wasm = instance.exports;
-      window.__exclosured_memory = instance.exports.memory;
+      const name = "image_filter";
+      const mod = await import(`/wasm/${name}/${name}.js`);
+      const wasm = await mod.default(`/wasm/${name}/${name}_bg.wasm`);
+      window.__exclosured_wasm = wasm;
+      window.__exclosured_memory = wasm.memory;
       this.pushEvent("wasm:ready", {});
     } catch (err) {
       console.error("Failed to load WASM module 'image_filter'", err);
@@ -70,16 +66,12 @@ const CompareHook = {
 
     // Otherwise load it ourselves
     try {
-      const resp = fetch("/wasm/image_filter.wasm");
-      const { instance } = await WebAssembly.instantiateStreaming(resp, {
-        env: {
-          __exclosured_emit: () => {},
-          __exclosured_broadcast: () => {},
-        },
-      });
-      window.__exclosured_wasm = instance.exports;
-      window.__exclosured_memory = instance.exports.memory;
-      this.wasm = instance.exports;
+      const name = "image_filter";
+      const mod = await import(`/wasm/${name}/${name}.js`);
+      const wasm = await mod.default(`/wasm/${name}/${name}_bg.wasm`);
+      window.__exclosured_wasm = wasm;
+      window.__exclosured_memory = wasm.memory;
+      this.wasm = wasm;
     } catch (err) {
       console.error("Failed to load WASM module", err);
     }
