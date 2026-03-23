@@ -23,3 +23,5 @@ config :live_svelte_wasm, LiveSvelteWasmWeb.Endpoint,
 
 config :logger, level: :info
 config :phoenix, :json_library, Jason
+
+config :mime, :types, %{"wasm" => ["application/wasm"]}

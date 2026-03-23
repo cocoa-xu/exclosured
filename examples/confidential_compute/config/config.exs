@@ -33,3 +33,5 @@ config :esbuild,
 
 config :logger, level: :info
 config :phoenix, :json_library, Jason
+
+config :mime, :types, %{"wasm" => ["application/wasm"]}
