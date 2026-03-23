@@ -25,3 +25,7 @@ config :logger, level: :info
 config :phoenix, :json_library, Jason
 
 config :mime, :types, %{"wasm" => ["application/wasm"]}
+
+if File.exists?(Path.expand("#{config_env()}.exs", __DIR__)) do
+  import_config "#{config_env()}.exs"
+end
