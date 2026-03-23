@@ -371,7 +371,7 @@ defmodule PrivateAnalyticsWeb.RoomLive do
           </div>
           <div class="sample-data-row">
             <span style="font-size:0.85rem;color:#8b949e;">Try it:</span>
-            <a href="/sample_data.csv" id="sample-data-link"
+            <a href="/sample_data.csv" id="sample-data-link" download="sample_data.csv"
                onclick="return handleSampleData(event)"
                style="font-size:0.85rem;color:#58a6ff;text-decoration:none;">
               sample_data.csv (1M rows, ~85 MB)
