@@ -18,7 +18,7 @@ defmodule PrivateAnalyticsWeb.Endpoint do
     at: "/",
     from: :private_analytics,
     gzip: false,
-    only: ~w(wasm assets)
+    only: ~w(wasm assets sample_data.csv)
 
   if code_reloading? do
     socket "/phoenix/live_reload/socket", Phoenix.LiveReloader.Socket

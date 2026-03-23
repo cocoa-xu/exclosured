@@ -973,6 +973,25 @@ window.toggleSchema = function() {
   if (icon) icon.innerHTML = container.classList.contains("collapsed") ? "&#9654;" : "&#9660;"
 }
 
+window.handleSampleData = function(event) {
+  const fileTab = document.querySelector('.load-tab[data-tab="file"]');
+  const urlTab = document.querySelector('.load-tab[data-tab="url"]');
+  const isUrlMode = urlTab && urlTab.classList.contains("active");
+
+  if (isUrlMode) {
+    // Fill the URL input with the sample data URL
+    event.preventDefault();
+    const urlInput = document.getElementById("data-url-input");
+    if (urlInput) {
+      urlInput.value = window.location.origin + "/sample_data.csv";
+    }
+    return false;
+  } else {
+    // File mode: let the browser download the CSV
+    return true;
+  }
+}
+
 window.switchLoadTab = function(tab) {
   document.querySelectorAll(".load-tab").forEach(t => t.classList.remove("active"))
   document.querySelectorAll(".load-tab-content").forEach(c => { c.classList.remove("active"); c.style.display = "none" })

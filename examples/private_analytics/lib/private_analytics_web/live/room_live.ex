@@ -369,6 +369,14 @@ defmodule PrivateAnalyticsWeb.RoomLive do
             <button class="load-tab active" data-tab="file" onclick="switchLoadTab('file')">Upload File</button>
             <button class="load-tab" data-tab="url" onclick="switchLoadTab('url')">Load from URL</button>
           </div>
+          <div class="sample-data-row">
+            <span style="font-size:0.85rem;color:#8b949e;">Try it:</span>
+            <a href="/sample_data.csv" id="sample-data-link"
+               onclick="return handleSampleData(event)"
+               style="font-size:0.85rem;color:#58a6ff;text-decoration:none;">
+              sample_data.csv (1M rows, ~85 MB)
+            </a>
+          </div>
           <div id="tab-file" class="load-tab-content active">
             <div class="upload-area" id="drop-zone">
               <div class="upload-icon">&#128196;</div>

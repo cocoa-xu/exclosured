@@ -21,7 +21,7 @@ defmodule PrivateAnalytics.MixProject do
   end
 
   defp aliases do
-    [setup: ["deps.get"]]
+    [setup: ["deps.get", "private_analytics.gen_csv"]]
   end
 
   defp deps do

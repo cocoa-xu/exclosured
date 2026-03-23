@@ -2,6 +2,7 @@
 /deps/
 priv/static/wasm/
 priv/static/assets/
+priv/static/sample_data.csv
 native/wasm/target/
 *.beam
 .elixir_ls/
