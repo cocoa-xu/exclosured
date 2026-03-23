@@ -71,7 +71,7 @@ defmodule PrivateAnalyticsWeb.Components do
     let html_bytes = markup.into_string().into_bytes();
     let n = html_bytes.len().min(data.len());
     data[..n].copy_from_slice(&html_bytes[..n]);
-    return n as i32;
+    n as i32
     """
   end
 end
