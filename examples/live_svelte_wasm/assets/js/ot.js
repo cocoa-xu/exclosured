@@ -9,14 +9,23 @@
  * Example: [5, "hello", -3, 10]
  */
 
+// -- Codepoint helpers --------------------------------------------------------
+// All positions are measured in Unicode codepoints (not UTF-16 code units)
+// to match the Elixir server which uses String.codepoints/1.
+
+function cpArray(str) { return Array.from(str); }
+function cpLen(str) { return Array.from(str).length; }
+function cpSlice(str, start, end) { return Array.from(str).slice(start, end).join(""); }
+
 // -- Apply --------------------------------------------------------------------
 
 export function applyOp(doc, op) {
+  const chars = cpArray(doc);
   let pos = 0;
   let result = [];
   for (const comp of op) {
     if (typeof comp === "number" && comp > 0) {
-      result.push(doc.slice(pos, pos + comp));
+      result.push(chars.slice(pos, pos + comp).join(""));
       pos += comp;
     } else if (typeof comp === "string") {
       result.push(comp);
@@ -24,8 +33,8 @@ export function applyOp(doc, op) {
       pos += Math.abs(comp);
     }
   }
-  if (pos !== doc.length) {
-    throw new Error(`OT apply: pos ${pos} != doc length ${doc.length}`);
+  if (pos !== chars.length) {
+    throw new Error(`OT apply: pos ${pos} != doc length ${chars.length}`);
   }
   return result.join("");
 }
@@ -46,14 +55,14 @@ export function transform(opA, opB, priority = "left") {
     // A inserts
     if (typeof aComp === "string") {
       aPrime.push(aComp);
-      bPrime.push(aComp.length);
+      bPrime.push(cpLen(aComp));
       aComp = ia < a.length ? a[ia++] : null;
       continue;
     }
 
     // B inserts
     if (typeof bComp === "string") {
-      aPrime.push(bComp.length);
+      aPrime.push(cpLen(bComp));
       bPrime.push(bComp);
       bComp = ib < b.length ? b[ib++] : null;
       continue;
@@ -137,19 +146,19 @@ export function compose(opA, opB) {
 
     // A inserts, B retains
     if (typeof aComp === "string" && typeof bComp === "number" && bComp > 0) {
-      const aLen = aComp.length;
+      const aLen = cpLen(aComp);
       const min = Math.min(aLen, bComp);
-      result.push(aComp.slice(0, min));
-      aComp = aLen - min > 0 ? aComp.slice(min) : (ia < a.length ? a[ia++] : null);
+      result.push(cpSlice(aComp, 0, min));
+      aComp = aLen - min > 0 ? cpSlice(aComp, min) : (ia < a.length ? a[ia++] : null);
       bComp = bComp - min || (ib < b.length ? b[ib++] : null);
       if (bComp === 0) bComp = ib < b.length ? b[ib++] : null;
     }
     // A inserts, B deletes — cancel out
     else if (typeof aComp === "string" && typeof bComp === "number" && bComp < 0) {
-      const aLen = aComp.length;
+      const aLen = cpLen(aComp);
       const delLen = -bComp;
       const min = Math.min(aLen, delLen);
-      aComp = aLen - min > 0 ? aComp.slice(min) : (ia < a.length ? a[ia++] : null);
+      aComp = aLen - min > 0 ? cpSlice(aComp, min) : (ia < a.length ? a[ia++] : null);
       bComp = delLen - min > 0 ? -(delLen - min) : (ib < b.length ? b[ib++] : null);
       if (bComp === 0) bComp = ib < b.length ? b[ib++] : null;
     }
@@ -179,11 +188,14 @@ export function compose(opA, opB) {
 // -- Diff ---------------------------------------------------------------------
 
 export function fromDiff(oldText, newText) {
+  const oldCps = cpArray(oldText);
+  const newCps = cpArray(newText);
+
   let prefixLen = 0;
   while (
-    prefixLen < oldText.length &&
-    prefixLen < newText.length &&
-    oldText[prefixLen] === newText[prefixLen]
+    prefixLen < oldCps.length &&
+    prefixLen < newCps.length &&
+    oldCps[prefixLen] === newCps[prefixLen]
   ) {
     prefixLen++;
   }
@@ -191,9 +203,9 @@ export function fromDiff(oldText, newText) {
   let oldSuffix = 0;
   let newSuffix = 0;
   while (
-    oldSuffix < oldText.length - prefixLen &&
-    newSuffix < newText.length - prefixLen &&
-    oldText[oldText.length - 1 - oldSuffix] === newText[newText.length - 1 - newSuffix]
+    oldSuffix < oldCps.length - prefixLen &&
+    newSuffix < newCps.length - prefixLen &&
+    oldCps[oldCps.length - 1 - oldSuffix] === newCps[newCps.length - 1 - newSuffix]
   ) {
     oldSuffix++;
     newSuffix++;
@@ -202,10 +214,10 @@ export function fromDiff(oldText, newText) {
   const ops = [];
   if (prefixLen > 0) ops.push(prefixLen);
 
-  const delCount = oldText.length - prefixLen - oldSuffix;
+  const delCount = oldCps.length - prefixLen - oldSuffix;
   if (delCount > 0) ops.push(-delCount);
 
-  const insText = newText.slice(prefixLen, newText.length - newSuffix);
+  const insText = newCps.slice(prefixLen, newCps.length - newSuffix).join("");
   if (insText.length > 0) ops.push(insText);
 
   if (oldSuffix > 0) ops.push(oldSuffix);
@@ -223,7 +235,7 @@ export function transformCursor(cursor, op) {
     if (typeof comp === "number" && comp > 0) {
       pos += comp;
     } else if (typeof comp === "string") {
-      newCursor += comp.length;
+      newCursor += cpLen(comp);
     } else if (typeof comp === "number" && comp < 0) {
       const del = Math.abs(comp);
       if (pos + del <= cursor) {

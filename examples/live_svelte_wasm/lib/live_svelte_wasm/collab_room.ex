@@ -3,7 +3,7 @@ defmodule LiveSvelteWasm.CollabRoom do
   GenServer holding the authoritative document state for a collaborative editing room.
   Handles OT: transforms incoming ops against concurrent history, applies, and broadcasts.
   """
-  use GenServer
+  use GenServer, restart: :temporary
 
   alias LiveSvelteWasm.OT
 
