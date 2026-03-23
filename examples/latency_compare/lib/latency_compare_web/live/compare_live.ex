@@ -27,18 +27,11 @@ defmodule LatencyCompareWeb.CompareLive do
     ~H"""
     <h1>Latency Comparison</h1>
     <p class="desc">
-      Drag the sliders and compare. Local modes (JS, WASM) run instantly in your browser.
+      Drag the sliders and compare. WASM mode runs instantly in your browser.
       Server modes send pixels to the server and back, showing the network cost.
     </p>
 
     <div class="mode-toggle">
-      <button
-        class={"mode-btn #{if @mode == "js", do: "active"}"}
-        phx-click="set_mode"
-        phx-value-mode="js"
-      >
-        Pure JS
-      </button>
       <button
         class={"mode-btn #{if @mode == "wasm", do: "active"}"}
         phx-click="set_mode"
@@ -124,13 +117,11 @@ defmodule LatencyCompareWeb.CompareLive do
     """
   end
 
-  defp mode_label("js"), do: "Pure JS latency"
   defp mode_label("wasm"), do: "WASM latency"
   defp mode_label("vix"), do: "Server (Vix) round-trip"
   defp mode_label("evision"), do: "Server (evision) round-trip"
   defp mode_label(_), do: "Latency"
 
-  defp mode_hint("js"), do: "Filter runs in a JavaScript pixel loop, no network involved"
   defp mode_hint("wasm"), do: "Filter runs in compiled WASM, no network involved"
 
   defp mode_hint("vix"),
@@ -141,7 +132,7 @@ defmodule LatencyCompareWeb.CompareLive do
 
   defp mode_hint(_), do: ""
 
-  defp latency_class(mode, ms) when mode in ~w(js wasm) and is_number(ms), do: "fast"
+  defp latency_class("wasm", ms) when is_number(ms), do: "fast"
 
   defp latency_class(mode, ms) when mode in ~w(vix evision) and is_number(ms) and ms < 20,
     do: "fast"
@@ -150,8 +141,13 @@ defmodule LatencyCompareWeb.CompareLive do
   defp latency_class(_, _), do: "none"
 
   @impl true
-  def handle_event("set_mode", %{"mode" => mode}, socket) when mode in ~w(js wasm vix evision) do
-    {:noreply, assign(socket, mode: mode, round_trip_ms: nil, server_compute_ms: nil)}
+  def handle_event("set_mode", %{"mode" => mode}, socket) when mode in ~w(wasm vix evision) do
+    socket =
+      socket
+      |> assign(mode: mode, round_trip_ms: nil, server_compute_ms: nil)
+      |> push_event("mode_changed", %{mode: mode})
+
+    {:noreply, socket}
   end
 
   def handle_event("wasm:ready", _params, socket) do

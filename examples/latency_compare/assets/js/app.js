@@ -22,8 +22,7 @@ const ExclosuredHook = {
 
 // === CompareHook ============================================================
 // Attached to the canvas container. Handles test pattern generation,
-// WASM image loading, and the four filter modes:
-// - Pure JS: JavaScript pixel loop (local)
+// WASM image loading, and the three filter modes:
 // - WASM: Rust compiled to WASM (local)
 // - Server (Vix): libvips on server (round-trip)
 // - Server (evision): OpenCV on server (round-trip)
@@ -37,6 +36,12 @@ const CompareHook = {
     this.wasm = null;
     this.pendingTimestamp = null;
     this.originalImageData = null;
+    this.currentMode = this.el.dataset.mode;
+
+    // Track mode changes (data-mode won't update due to phx-update="ignore")
+    this.handleEvent("mode_changed", ({ mode }) => {
+      this.currentMode = mode;
+    });
 
     // Register server event handler before any async work
     this.handleEvent("server:filter_result", (payload) => {
@@ -54,7 +59,7 @@ const CompareHook = {
     // Generate and render the test pattern
     this._generateTestPattern();
 
-    // Store original pixels for JS filter mode
+    // Store original pixels for server upload
     this.originalImageData = this.ctx.getImageData(0, 0, this.W, this.H);
 
     // Load the test pattern pixels into WASM
@@ -160,32 +165,6 @@ const CompareHook = {
     });
   },
 
-  _applyJsFilter(brightness, contrast) {
-    // Copy original image data (never mutate the original)
-    const imgData = new ImageData(
-      new Uint8ClampedArray(this.originalImageData.data),
-      this.W,
-      this.H
-    );
-    const data = imgData.data;
-
-    // Same formula as the Rust WASM filter for fair comparison
-    const cFactor = (contrast + 100) / 100;
-    const bOffset = brightness / 100;
-
-    for (let i = 0; i < data.length; i += 4) {
-      for (let ch = 0; ch < 3; ch++) {
-        const val = data[i + ch] / 255;
-        const contrasted = (val - 0.5) * cFactor + 0.5;
-        const result = contrasted + bOffset;
-        data[i + ch] = Math.max(0, Math.min(255, Math.round(result * 255)));
-      }
-      // Alpha unchanged
-    }
-
-    this.ctx.putImageData(imgData, 0, 0);
-  },
-
   _applyWasmFilter(brightness, contrast) {
     if (!this.wasm) return;
     this.wasm.apply_filter(brightness, contrast);
@@ -208,16 +187,11 @@ const CompareHook = {
     const contrastSlider = document.getElementById("contrast-slider");
 
     const onInput = () => {
-      const mode = this.el.dataset.mode;
+      const mode = this.currentMode;
       const b = parseInt(brightnessSlider.value, 10);
       const c = parseInt(contrastSlider.value, 10);
 
-      if (mode === "js") {
-        const start = performance.now();
-        this._applyJsFilter(b, c);
-        const elapsed = parseFloat((performance.now() - start).toFixed(1));
-        this.pushEvent("report_latency", { ms: elapsed });
-      } else if (mode === "wasm") {
+      if (mode === "wasm") {
         const start = performance.now();
         this._applyWasmFilter(b, c);
         const elapsed = parseFloat((performance.now() - start).toFixed(1));
