@@ -103,7 +103,7 @@ def project do
 end
 
 def deps do
-  [{:exclosured, "~> 0.1.1"}]
+  [{:exclosured, "~> 0.1.4"}]
 end
 ```
 

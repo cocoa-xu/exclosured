@@ -1,6 +1,6 @@
 [package]
 name = "exclosured_guest"
-version = "0.1.1"
+version = "0.1.4"
 edition = "2021"
 description = "Guest-side helpers for Exclosured WASM modules. Provides emit/broadcast for LiveView communication and alloc/dealloc for memory management."
 license = "MIT"

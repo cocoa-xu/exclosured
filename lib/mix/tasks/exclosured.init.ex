@@ -116,7 +116,7 @@ defmodule Mix.Tasks.Exclosured.Init do
 
     [dependencies]
     wasm-bindgen = "#{wasm_bindgen_requirement}"
-    exclosured_guest = "0.1"
+    exclosured_guest = "0.1.4"
     """
   end
 

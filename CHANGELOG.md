@@ -10,6 +10,30 @@ This project publishes to three registries. Version bumps are kept in sync.
 | [npmjs.com](https://www.npmjs.com/package/exclosured) | `exclosured` (JS LiveView hook) |
 | [crates.io](https://crates.io/crates/exclosured_guest) | `exclosured_guest` (Rust guest crate) |
 
+## 0.1.4
+
+### hex.pm (exclosured@0.1.4)
+
+- Fixed: generated inline and scaffolded crates now pin `wasm-bindgen` to the
+  installed `wasm-bindgen-cli` version, avoiding schema mismatches.
+- Fixed: compilation now fails clearly when `rustup` is missing instead of
+  silently skipping the wasm32 target check.
+- Fixed: incremental compilation now detects changes to `Cargo.lock`,
+  optimization mode, feature flags, cargo args, and build environment.
+- Fixed: LiveView calls and state pushes are routed to the intended WASM module.
+- Fixed: protocol decoding now raises clear `ArgumentError`s for invalid,
+  truncated, trailing, or unknown-atom payloads.
+
+### npm (exclosured@0.1.4)
+
+- Fixed: LiveView hook calls and state events ignore payloads for other modules.
+- Fixed: `exclosured/loader` CommonJS exports now include `WasmBuffer`.
+- Added: TypeScript declarations for `exclosured/loader`.
+
+### crates.io (exclosured_guest@0.1.4)
+
+- Version synced with the Hex and npm release.
+
 ## 0.1.2
 
 ### hex.pm (exclosured@0.1.2)
