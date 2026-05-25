@@ -30,6 +30,7 @@ Every other Elixir+Rust library ([Rustler](https://github.com/rusterlium/rustler
 | **Streaming results** | WASM emits incremental chunks, LiveView accumulates. |
 | **Server fallback** | If WASM fails to load, run an Elixir function instead. |
 | **Typed events** | Annotate Rust structs, get Elixir structs at compile time. |
+| **Typed RPC** | Annotate Rust exports, get LiveView call helpers at compile time. |
 | **Telemetry** | Every WASM operation emits `:telemetry` events. |
 
 ### Compared to other libraries
@@ -338,6 +339,28 @@ end
 to suppress any late result for that call. WASM modules can optionally export
 `cancel_call(ref)` for cooperative cancellation.
 
+Annotate Rust exports with `/// exclosured:rpc` to generate typed LiveView
+call helpers:
+
+```rust
+/// exclosured:rpc
+#[wasm_bindgen]
+pub fn process(input: String, factor: f64) -> f64 {
+    input.len() as f64 * factor
+}
+```
+
+```elixir
+defmodule MyApp.Wasm do
+  use Exclosured.RPC,
+    source: "native/wasm/my_module/src/lib.rs",
+    module: :my_module
+end
+
+socket = MyApp.Wasm.process(socket, text, 2.0)
+{:ok, ref, socket} = MyApp.Wasm.process_async(socket, text, 2.0, timeout: 5_000)
+```
+
 When multiple sandbox instances are mounted on the same page, hook-managed guest
 callbacks from `exclosured_guest::emit/2` and `exclosured_guest::broadcast/2`
 are routed through the calling hook instance. Broadcast channels still use the
@@ -500,6 +523,36 @@ Exclosured.Test.error(view, ref, :processor, "score", :timeout)
 
 Helpers return rendered HTML when passed a `Phoenix.LiveViewTest.View`; passing
 a pid sends the message and returns `:ok`.
+
+### Typed RPC
+
+`Exclosured.RPC` reads annotated Rust exports at compile time and generates
+Elixir helpers that delegate to `Exclosured.LiveView.call/5` and
+`call_async/5`.
+
+```rust
+/// exclosured:rpc
+#[wasm_bindgen]
+pub fn score(input: String, weight: f64) -> f64 {
+    input.len() as f64 * weight
+}
+```
+
+```elixir
+defmodule MyApp.Wasm do
+  use Exclosured.RPC,
+    source: "native/wasm/processor/src/lib.rs",
+    module: :processor
+end
+
+def handle_event("score", %{"input" => input}, socket) do
+  {:ok, ref, socket} = MyApp.Wasm.score_async(socket, input, 1.5, timeout: 5_000)
+  {:noreply, assign(socket, active_ref: ref)}
+end
+```
+
+Generated helpers include typespecs and `__rpc__/0` metadata for the parsed
+exports. Keep the annotation on browser-callable `#[wasm_bindgen]` functions.
 
 ### Typed Events
 
