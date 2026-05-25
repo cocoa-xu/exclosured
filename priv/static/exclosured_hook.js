@@ -111,6 +111,29 @@ function dispatchBroadcast(channel, data) {
   bus.dispatchEvent(new CustomEvent(channel, { detail: data }));
 }
 
+function bytesFromPayload(value, encoding) {
+  if (value instanceof Uint8Array) return value;
+  if (value instanceof ArrayBuffer) return new Uint8Array(value);
+  if (Array.isArray(value)) return new Uint8Array(value);
+  if (encoding === "base64" && typeof value === "string") {
+    return base64ToBytes(value);
+  }
+  return new Uint8Array(value);
+}
+
+function base64ToBytes(value) {
+  const binary =
+    typeof atob === "function"
+      ? atob(value)
+      : Buffer.from(value, "base64").toString("binary");
+
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
+
 getExclosuredRuntime();
 
 const WORKER_SOURCE = `
@@ -184,10 +207,34 @@ function applyState(message) {
   if (!wasmModule || typeof wasmModule.apply_state !== "function") return;
 
   if (Object.prototype.hasOwnProperty.call(message, "binary")) {
-    wasmModule.apply_state(new Uint8Array(message.binary));
+    wasmModule.apply_state(
+      bytesFromPayload(
+        message.binary,
+        message.binaryEncoding || message.binary_encoding
+      )
+    );
   } else {
     wasmModule.apply_state(encoder.encode(JSON.stringify(message.state)));
   }
+}
+
+function bytesFromPayload(value, encoding) {
+  if (value instanceof Uint8Array) return value;
+  if (value instanceof ArrayBuffer) return new Uint8Array(value);
+  if (Array.isArray(value)) return new Uint8Array(value);
+  if (encoding === "base64" && typeof value === "string") {
+    return base64ToBytes(value);
+  }
+  return new Uint8Array(value);
+}
+
+function base64ToBytes(value) {
+  const binary = atob(value);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
 }
 
 async function callWasm({ func, args, ref }) {
@@ -433,7 +480,10 @@ export const ExclosuredHook = {
     if (!this._wasmReady) return;
 
     if (Object.prototype.hasOwnProperty.call(payload, "binary")) {
-      const binary = new Uint8Array(payload.binary);
+      const binary = bytesFromPayload(
+        payload.binary,
+        payload.binaryEncoding || payload.binary_encoding
+      );
 
       if (this._workerMode) {
         this._worker.postMessage({ type: "state", binary }, [binary.buffer]);
@@ -565,8 +615,24 @@ export const ExclosuredHook = {
     const syncAttr = this.el.dataset.wasmSync;
     if (!syncAttr || !this._wasmReady) return;
 
-    if (syncAttr === this._lastSyncData) return;
-    this._lastSyncData = syncAttr;
+    const encoding = this.el.dataset.wasmSyncEncoding || "json";
+    const syncKey = `${encoding}:${syncAttr}`;
+
+    if (syncKey === this._lastSyncData) return;
+    this._lastSyncData = syncKey;
+
+    if (encoding === "binary") {
+      this._applyStatePayload({
+        binary: syncAttr,
+        binaryEncoding: "base64",
+      });
+      return;
+    }
+
+    if (encoding !== "json") {
+      console.error(`Exclosured: unsupported sync encoding '${encoding}'`);
+      return;
+    }
 
     try {
       const state = JSON.parse(syncAttr);

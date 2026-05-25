@@ -376,6 +376,32 @@ LiveView assigns flow to WASM automatically. No `push_event` calls:
 
 When `@speed` changes, the component re-renders and the hook pushes the new value to WASM's `apply_state()`.
 
+For higher-frequency state sync, encode the payload with `Exclosured.Protocol`
+instead of JSON:
+
+```heex
+<Exclosured.LiveView.sandbox
+  module={:visualizer}
+  sync={Exclosured.LiveView.sync(assigns, ~w(speed color count)a)}
+  encoding={:binary}
+/>
+```
+
+Binary sync still calls the same Rust `apply_state(data: &[u8])` export, but
+`data` contains Exclosured protocol bytes. In Rust, decode it with the guest
+helper:
+
+```rust
+use exclosured_guest::protocol::{self, Value};
+
+#[wasm_bindgen]
+pub fn apply_state(data: &[u8]) {
+    if let Ok(Value::Map(entries)) = protocol::decode(data) {
+        // Read entries from the compact binary state payload.
+    }
+}
+```
+
 ### Web Worker Mode
 
 For compute-heavy modules, run WASM off the browser's main thread by setting
@@ -428,6 +454,7 @@ exclosured::broadcast("channel", &payload);               // send to other WASM 
 Exclosured.LiveView.call(socket, :mod, "func", [args])
 Exclosured.LiveView.call(socket, :mod, "func", [args], fallback: fn [args] -> ... end)
 Exclosured.LiveView.push_state(socket, :mod, %{key: value})
+Exclosured.LiveView.push_state(socket, :mod, %{key: value}, encoding: :binary)
 Exclosured.LiveView.sync(assigns, [:key1, :key2, renamed: :original_key])
 Exclosured.LiveView.stream_call(socket, :mod, "func", [args], on_chunk: ..., on_done: ...)
 ```

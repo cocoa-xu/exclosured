@@ -2,6 +2,7 @@ defmodule Exclosured.LiveViewTest do
   use ExUnit.Case
 
   alias Exclosured.LiveView
+  alias Exclosured.Protocol
   import Phoenix.LiveViewTest
 
   setup do
@@ -199,6 +200,26 @@ defmodule Exclosured.LiveViewTest do
     end
   end
 
+  describe "push_state/4" do
+    test "encodes map state with the binary protocol" do
+      state = %{"count" => 42, "enabled" => true}
+      socket = LiveView.push_state(build_push_socket(), :my_mod, state, encoding: :binary)
+
+      payload = pushed_payload(socket, "wasm:state")
+
+      assert payload.module == :my_mod
+      assert payload.encoding == "binary"
+      assert payload.binary_encoding == "base64"
+      assert Protocol.decode(Base.decode64!(payload.binary)) == state
+    end
+
+    test "keeps raw binary push_state payloads unchanged" do
+      socket = LiveView.push_state(build_push_socket(), :my_mod, <<1, 2, 3>>)
+
+      assert pushed_payload(socket, "wasm:state") == %{module: :my_mod, binary: <<1, 2, 3>>}
+    end
+  end
+
   describe "sandbox/1" do
     test "renders worker mode data attribute when enabled" do
       html = render_component(&LiveView.sandbox/1, module: :processor, worker: true)
@@ -228,6 +249,32 @@ defmodule Exclosured.LiveViewTest do
 
       refute html =~ "data-wasm-worker"
     end
+
+    test "renders binary-encoded sync payloads" do
+      state = %{"count" => 42, "enabled" => true}
+
+      html =
+        render_component(&LiveView.sandbox/1,
+          module: :processor,
+          sync: state,
+          encoding: :binary
+        )
+
+      assert html =~ ~s(data-wasm-sync-encoding="binary")
+
+      encoded = html_attr!(html, "data-wasm-sync")
+      assert Protocol.decode(Base.decode64!(encoded)) == state
+    end
+
+    test "rejects unsupported sync encodings" do
+      assert_raise ArgumentError, ~r/unsupported Exclosured sync encoding/, fn ->
+        render_component(&LiveView.sandbox/1,
+          module: :processor,
+          sync: %{"count" => 42},
+          encoding: :msgpack
+        )
+      end
+    end
   end
 
   defp build_socket do
@@ -250,5 +297,20 @@ defmodule Exclosured.LiveViewTest do
 
   defp pushed_event?(socket, event, payload) do
     Enum.any?(socket.private.live_temp.push_events, &(&1 == [event, payload]))
+  end
+
+  defp pushed_payload(socket, event) do
+    [^event, payload] =
+      Enum.find(socket.private.live_temp.push_events, fn
+        [^event, _payload] -> true
+        _other -> false
+      end)
+
+    payload
+  end
+
+  defp html_attr!(html, name) do
+    [_, value] = Regex.run(~r/#{name}="([^"]+)"/, html)
+    value
   end
 end
