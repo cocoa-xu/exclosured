@@ -2,7 +2,7 @@ defmodule Exclosured.Manifest do
   @moduledoc """
   Manages the build manifest for incremental compilation.
 
-  Tracks modification times of source files (.rs, .toml) to determine
+  Tracks modification times of source files (.rs, .toml, .lock) to determine
   which modules need recompilation.
   """
 
@@ -67,7 +67,11 @@ defmodule Exclosured.Manifest do
     name = Atom.to_string(module_config.name)
     source_dir = Path.join(config.source_dir, name)
     mtimes = collect_mtimes(source_dir)
-    Map.put(manifest, module_config.name, %{mtimes: mtimes})
+
+    Map.put(manifest, module_config.name, %{
+      mtimes: mtimes,
+      fingerprint: module_fingerprint(module_config, config)
+    })
   end
 
   defp module_stale?(module_config, config, manifest) do
@@ -85,15 +89,16 @@ defmodule Exclosured.Manifest do
       nil ->
         true
 
-      %{mtimes: old_mtimes} ->
-        not output_exists or collect_mtimes(source_dir) != old_mtimes
+      %{mtimes: old_mtimes} = entry ->
+        not output_exists or collect_mtimes(source_dir) != old_mtimes or
+          Map.get(entry, :fingerprint) != module_fingerprint(module_config, config)
     end
   end
 
   defp collect_mtimes(dir) do
     if File.dir?(dir) do
       dir
-      |> Path.join("**/*.{rs,toml}")
+      |> Path.join("**/*.{rs,toml,lock}")
       |> Path.wildcard()
       |> Enum.sort()
       |> Enum.map(fn file ->
@@ -106,6 +111,12 @@ defmodule Exclosured.Manifest do
     else
       %{}
     end
+  end
+
+  defp module_fingerprint(module_config, config) do
+    module_config
+    |> Map.take([:features, :no_default_features, :env, :cargo_args])
+    |> Map.put(:optimize, config.optimize)
   end
 
   defp migrate(manifest) when is_map(manifest), do: manifest

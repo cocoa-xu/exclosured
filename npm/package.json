@@ -10,7 +10,8 @@
     "index.mjs",
     "index.d.ts",
     "loader.js",
-    "loader.mjs"
+    "loader.mjs",
+    "loader.d.ts"
   ],
   "keywords": [
     "phoenix",

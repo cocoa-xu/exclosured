@@ -41,8 +41,17 @@ defmodule Exclosured.Protocol do
   Decode a binary wire format back into an Elixir term.
   """
   def decode(binary) when is_binary(binary) do
-    {term, ""} = decode_term(binary)
-    term
+    case decode_term(binary) do
+      {:ok, term, ""} ->
+        term
+
+      {:ok, _term, rest} ->
+        raise ArgumentError,
+              "invalid Exclosured protocol payload: #{byte_size(rest)} trailing bytes"
+
+      :error ->
+        raise ArgumentError, "invalid Exclosured protocol payload"
+    end
   end
 
   # Encoding
@@ -93,47 +102,55 @@ defmodule Exclosured.Protocol do
 
   # Decoding
 
-  defp decode_term(<<@tag_nil, rest::binary>>), do: {nil, rest}
-  defp decode_term(<<@tag_bool, 1, rest::binary>>), do: {true, rest}
-  defp decode_term(<<@tag_bool, 0, rest::binary>>), do: {false, rest}
+  defp decode_term(<<@tag_nil, rest::binary>>), do: {:ok, nil, rest}
+  defp decode_term(<<@tag_bool, 1, rest::binary>>), do: {:ok, true, rest}
+  defp decode_term(<<@tag_bool, 0, rest::binary>>), do: {:ok, false, rest}
 
-  defp decode_term(<<@tag_int, n::signed-big-64, rest::binary>>), do: {n, rest}
-  defp decode_term(<<@tag_float, f::float-64, rest::binary>>), do: {f, rest}
+  defp decode_term(<<@tag_int, n::signed-big-64, rest::binary>>), do: {:ok, n, rest}
+  defp decode_term(<<@tag_float, f::float-64, rest::binary>>), do: {:ok, f, rest}
 
   defp decode_term(<<@tag_string, len::unsigned-big-32, str::binary-size(len), rest::binary>>) do
-    {str, rest}
+    {:ok, str, rest}
   end
 
   defp decode_term(<<@tag_binary, len::unsigned-big-32, data::binary-size(len), rest::binary>>) do
-    {data, rest}
+    {:ok, data, rest}
   end
 
   defp decode_term(<<@tag_atom, len::unsigned-big-32, str::binary-size(len), rest::binary>>) do
-    {String.to_existing_atom(str), rest}
+    {:ok, String.to_existing_atom(str), rest}
+  rescue
+    ArgumentError -> :error
   end
 
   defp decode_term(<<@tag_list, count::unsigned-big-32, rest::binary>>) do
-    {items, rest} = decode_n(rest, count, [])
-    {items, rest}
+    with {:ok, items, rest} <- decode_n(rest, count, []) do
+      {:ok, items, rest}
+    end
   end
 
   defp decode_term(<<@tag_map, count::unsigned-big-32, rest::binary>>) do
-    {pairs, rest} = decode_pairs(rest, count, [])
-    {Map.new(pairs), rest}
+    with {:ok, pairs, rest} <- decode_pairs(rest, count, []) do
+      {:ok, Map.new(pairs), rest}
+    end
   end
 
-  defp decode_n(rest, 0, acc), do: {Enum.reverse(acc), rest}
+  defp decode_term(_), do: :error
+
+  defp decode_n(rest, 0, acc), do: {:ok, Enum.reverse(acc), rest}
 
   defp decode_n(binary, n, acc) do
-    {term, rest} = decode_term(binary)
-    decode_n(rest, n - 1, [term | acc])
+    with {:ok, term, rest} <- decode_term(binary) do
+      decode_n(rest, n - 1, [term | acc])
+    end
   end
 
-  defp decode_pairs(rest, 0, acc), do: {acc, rest}
+  defp decode_pairs(rest, 0, acc), do: {:ok, acc, rest}
 
   defp decode_pairs(binary, n, acc) do
-    {key, rest} = decode_term(binary)
-    {value, rest} = decode_term(rest)
-    decode_pairs(rest, n - 1, [{key, value} | acc])
+    with {:ok, key, rest} <- decode_term(binary),
+         {:ok, value, rest} <- decode_term(rest) do
+      decode_pairs(rest, n - 1, [{key, value} | acc])
+    end
   end
 end

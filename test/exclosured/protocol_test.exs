@@ -57,4 +57,34 @@ defmodule Exclosured.ProtocolTest do
       assert original == Protocol.decode(Protocol.encode(original))
     end
   end
+
+  describe "decode/1 errors" do
+    test "raises on unknown type tag" do
+      assert_raise ArgumentError, ~r/invalid Exclosured protocol payload/, fn ->
+        Protocol.decode(<<0xFF>>)
+      end
+    end
+
+    test "raises on truncated payload" do
+      assert_raise ArgumentError, ~r/invalid Exclosured protocol payload/, fn ->
+        Protocol.decode(<<0x03, 0, 0, 0, 4, "ab">>)
+      end
+    end
+
+    test "raises on trailing bytes" do
+      assert_raise ArgumentError, ~r/1 trailing bytes/, fn ->
+        Protocol.decode(Protocol.encode(:ok) <> <<0>>)
+      end
+    end
+
+    test "raises on unknown atom" do
+      atom_name = "exclosured_unknown_atom_#{System.unique_integer([:positive])}"
+
+      payload = <<0x09, byte_size(atom_name)::unsigned-big-32, atom_name::binary>>
+
+      assert_raise ArgumentError, ~r/invalid Exclosured protocol payload/, fn ->
+        Protocol.decode(payload)
+      end
+    end
+  end
 end

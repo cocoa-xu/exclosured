@@ -13,6 +13,9 @@
 # Temporary files, for example, from tests.
 /tmp/
 
+# Local planning scratchpad.
+/PLAN.md
+
 # If the VM crashes, it generates a dump, let's ignore it too.
 erl_crash.dump
 
@@ -28,5 +31,14 @@ exclosured-*.tar
 # Cargo build artifacts
 native/wasm/target/
 native/exclosured_guest/target/
+
+# Example build artifacts
+/examples/*/_build/
+/examples/*/cover/
+/examples/*/deps/
+/examples/*/dist/
+/examples/*/priv/static/wasm/
+/examples/*/assets/node_modules/
+/examples/*/node_modules/
 
 .DS_Store

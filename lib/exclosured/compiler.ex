@@ -65,7 +65,27 @@ defmodule Exclosured.Compiler do
   end
 
   defp check_wasm32_target do
-    case System.cmd("rustup", ["target", "list", "--installed"], stderr_to_stdout: true) do
+    case System.find_executable("rustup") do
+      nil ->
+        Mix.raise("""
+        `rustup` not found in PATH.
+
+        Exclosured needs Rustup to verify the wasm32-unknown-unknown target.
+
+        Install Rust and Cargo:
+
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+
+        Then restart your shell and try again.
+        """)
+
+      rustup ->
+        check_wasm32_target(rustup)
+    end
+  end
+
+  defp check_wasm32_target(rustup) do
+    case System.cmd(rustup, ["target", "list", "--installed"], stderr_to_stdout: true) do
       {output, 0} ->
         if String.contains?(output, "wasm32-unknown-unknown") do
           :ok
@@ -82,7 +102,6 @@ defmodule Exclosured.Compiler do
         end
 
       {_, _} ->
-        # rustup might not be available; try cargo build anyway
         :ok
     end
   end
