@@ -130,6 +130,59 @@ defmodule Exclosured.LiveViewTest do
     end
   end
 
+  describe "call_async/5" do
+    test "runs fallback and sends a correlated result" do
+      socket = build_socket()
+
+      {:ok, ref, returned_socket} =
+        LiveView.call_async(socket, :my_mod, "count", ["hello world"],
+          fallback: fn [text] -> length(String.split(text)) end
+        )
+
+      assert returned_socket == socket
+      assert is_binary(ref)
+      assert_receive {:wasm_result, ^ref, :my_mod, "count", 2}
+      refute_receive {:wasm_result, :my_mod, "count", 2}
+    end
+
+    test "validates timeout option" do
+      socket = build_push_socket() |> mark_ready(:my_mod)
+
+      assert_raise ArgumentError, ~r/:timeout/, fn ->
+        LiveView.call_async(socket, :my_mod, "process", [42], timeout: -1)
+      end
+    end
+
+    test "stores pending calls and can cancel by ref" do
+      socket = build_push_socket() |> mark_ready(:my_mod)
+
+      {:ok, ref, socket} =
+        LiveView.call_async(socket, :my_mod, "process", [42], timeout: 10_000)
+
+      assert %{
+               module: :my_mod,
+               func: "process",
+               timer: timer
+             } = socket.private.exclosured_pending_calls[ref]
+
+      assert is_reference(timer)
+
+      assert pushed_event?(socket, "wasm:call", %{
+               module: :my_mod,
+               func: "process",
+               args: [42],
+               ref: ref
+             })
+
+      socket = LiveView.cancel_call(socket, ref)
+
+      refute Map.has_key?(socket.private.exclosured_pending_calls, ref)
+      assert MapSet.member?(socket.private.exclosured_ignored_call_refs, ref)
+
+      assert pushed_event?(socket, "wasm:cancel", %{module: :my_mod, ref: ref})
+    end
+  end
+
   describe "stream_call/5" do
     test "requires :on_chunk option" do
       assert_raise KeyError, ~r/key :on_chunk not found/, fn ->
@@ -182,5 +235,20 @@ defmodule Exclosured.LiveViewTest do
       assigns: %{__changed__: %{}},
       private: %{}
     }
+  end
+
+  defp build_push_socket do
+    %Phoenix.LiveView.Socket{
+      assigns: %{__changed__: %{}},
+      private: %{live_temp: %{}}
+    }
+  end
+
+  defp mark_ready(socket, module) do
+    put_in(socket, [Access.key(:private), :exclosured_ready], MapSet.new([module]))
+  end
+
+  defp pushed_event?(socket, event, payload) do
+    Enum.any?(socket.private.live_temp.push_events, &(&1 == [event, payload]))
   end
 end
