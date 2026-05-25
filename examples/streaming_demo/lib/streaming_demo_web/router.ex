@@ -15,5 +15,6 @@ defmodule StreamingDemoWeb.Router do
   scope "/", StreamingDemoWeb do
     pipe_through :browser
     live "/", PrimeLive
+    live "/worker", WorkerLive
   end
 end

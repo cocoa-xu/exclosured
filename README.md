@@ -59,7 +59,7 @@ Every other Elixir+Rust library ([Rustler](https://github.com/rusterlium/rustler
 
 ## Demos
 
-Fifteen example applications in `examples/`, each with its own README.
+Seventeen example applications in `examples/`, each with its own README.
 
 | # | Demo | What it shows |
 |---|---|---|
@@ -79,6 +79,7 @@ Fifteen example applications in `examples/`, each with its own README.
 | 14 | [**Brotli Compress**](examples/brotli_compress/) | Brotli (WASM) vs Gzip (JS) compression benchmark |
 | 15 | [**Matrix Multiply**](examples/matrix_mul/) | 5-way benchmark: JS vs WASM vs WebGPU vs TF.js vs OpenCV |
 | 16 | [**Elixir Notebook**](examples/elixir_notebook/) | Livebook-like static site: IEx + syntect highlighting + pulldown-cmark + Rust SQLite |
+| 17 | [Streaming + Worker Compare](examples/streaming_demo/) | Streaming emits plus main-thread vs worker-mode responsiveness |
 
 Most demos run with `cd examples/<name> && mix setup && mix phx.server`. Some require npm setup; see each example's README. The Elixir Notebook (16) requires `mise exec -- mix release`; see its README.
 
