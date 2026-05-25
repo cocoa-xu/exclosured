@@ -6,7 +6,12 @@ export declare class WasmBuffer {
   free(): void;
 }
 
+export type ExclosuredWasmModule = Record<string, unknown>;
+
 export declare const ExclosuredLoader: {
-  load(jsUrl: string, wasmUrl: string): Promise<Record<string, unknown>>;
-  loadAsset(wasmModule: Record<string, unknown>, assetUrl: string): Promise<WasmBuffer>;
+  load<TModule extends ExclosuredWasmModule = ExclosuredWasmModule>(
+    jsUrl: string,
+    wasmUrl: string
+  ): Promise<TModule>;
+  loadAsset(wasmModule: ExclosuredWasmModule, assetUrl: string): Promise<WasmBuffer>;
 };

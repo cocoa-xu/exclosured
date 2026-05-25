@@ -9,12 +9,20 @@ defmodule Exclosured.RPCTest do
     test "parses annotated RPC functions" do
       rpcs = @test_rs_path |> File.read!() |> Parser.parse()
 
-      assert Enum.map(rpcs, & &1.name) == ["score", "tokenize", "digest", "version"]
+      assert Enum.map(rpcs, & &1.name) == [
+               "score",
+               "tokenize",
+               "digest",
+               "version",
+               "fetch_score"
+             ]
+
       refute Enum.any?(rpcs, &(&1.name == "internal"))
     end
 
     test "extracts function arguments and return types" do
-      [score, tokenize, digest, version] = @test_rs_path |> File.read!() |> Parser.parse()
+      [score, tokenize, digest, version, fetch_score] =
+        @test_rs_path |> File.read!() |> Parser.parse()
 
       assert score.args == [
                %{name: "input", type: "String"},
@@ -22,6 +30,7 @@ defmodule Exclosured.RPCTest do
              ]
 
       assert score.return == "f64"
+      refute score.async
 
       assert tokenize.args == [
                %{name: "text", type: "&str"},
@@ -32,6 +41,9 @@ defmodule Exclosured.RPCTest do
       assert digest.args == [%{name: "data", type: "&[u8]"}]
       assert version.args == []
       assert version.return == "String"
+      assert fetch_score.args == [%{name: "input", type: "String"}]
+      assert fetch_score.return == "u32"
+      assert fetch_score.async
     end
 
     test "handles empty source" do
@@ -57,7 +69,14 @@ defmodule Exclosured.RPCTest do
 
     test "generates metadata helpers" do
       assert TestRPC.__rpc_module__() == :processor
-      assert Enum.map(TestRPC.__rpc__(), & &1.name) == ["score", "tokenize", "digest", "version"]
+
+      assert Enum.map(TestRPC.__rpc__(), & &1.name) == [
+               "score",
+               "tokenize",
+               "digest",
+               "version",
+               "fetch_score"
+             ]
     end
 
     test "generated sync helpers delegate to Exclosured.LiveView.call/5" do
@@ -103,6 +122,51 @@ defmodule Exclosured.RPCTest do
 
       assert returned_socket == socket
       assert_receive {:wasm_result, :processor, "version", "1.0.0"}
+    end
+  end
+
+  describe "TypeScript.generate/2" do
+    test "generates declarations from parsed RPC metadata" do
+      declarations =
+        @test_rs_path
+        |> File.read!()
+        |> Exclosured.RPC.TypeScript.generate_from_source(
+          source: @test_rs_path,
+          module_name: "ProcessorModule"
+        )
+
+      assert declarations =~ "// Source: #{@test_rs_path}"
+      assert declarations =~ "export interface ProcessorModule {"
+      assert declarations =~ "score: (input: string, factor: number) => number;"
+      assert declarations =~ "tokenize: (text: string, limit: number | null) => string[];"
+      assert declarations =~ "digest: (data: Uint8Array) => number;"
+      assert declarations =~ "version: () => string;"
+      assert declarations =~ "fetch_score: (input: string) => Promise<number>;"
+      assert declarations =~ "export function fetch_score(input: string): Promise<number>;"
+    end
+
+    test "falls back to safe TypeScript names and unknown custom types" do
+      declarations =
+        [
+          %{
+            name: "run",
+            args: [
+              %{name: "type", type: "Vec<Option<u32>>"},
+              %{name: "result", type: "ScoreResult"}
+            ],
+            return: "ScoreResult",
+            async: false
+          }
+        ]
+        |> Exclosured.RPC.TypeScript.generate()
+
+      assert declarations =~ "run: (arg1: Array<number | null>, result: unknown) => unknown;"
+    end
+
+    test "validates generated interface names" do
+      assert_raise ArgumentError, ~r/invalid TypeScript interface name/, fn ->
+        Exclosured.RPC.TypeScript.generate([], module_name: "bad-name")
+      end
     end
   end
 

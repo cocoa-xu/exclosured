@@ -554,6 +554,28 @@ end
 Generated helpers include typespecs and `__rpc__/0` metadata for the parsed
 exports. Keep the annotation on browser-callable `#[wasm_bindgen]` functions.
 
+Generate a matching TypeScript declaration file for client-side imports:
+
+```sh
+mix exclosured.rpc.types \
+  --source native/wasm/processor/src/lib.rs \
+  --out assets/js/processor.d.ts \
+  --module-name ProcessorModule
+```
+
+The generated declarations include the wasm-bindgen default initializer, named
+RPC exports, and a module interface that can be used with the npm loader:
+
+```typescript
+import { ExclosuredLoader } from "exclosured/loader";
+import type { ProcessorModule } from "./processor";
+
+const processor = await ExclosuredLoader.load<ProcessorModule>(
+  "/wasm/processor/processor.js",
+  "/wasm/processor/processor_bg.wasm"
+);
+```
+
 ### Typed Events
 
 ```rust

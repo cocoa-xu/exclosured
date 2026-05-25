@@ -8,7 +8,12 @@ defmodule Exclosured.RPC.Parser do
 
   Each RPC is a map:
 
-      %{name: "score", args: [%{name: "input", type: "String"}], return: "u32"}
+      %{
+        name: "score",
+        args: [%{name: "input", type: "String"}],
+        return: "u32",
+        async: false
+      }
   """
   def parse(source) when is_binary(source) do
     source
@@ -88,17 +93,23 @@ defmodule Exclosured.RPC.Parser do
       |> String.replace(~r/\s+/, " ")
       |> String.trim()
 
-    case Regex.run(
-           ~r/^(?:pub(?:\([^)]*\))?\s+)?(?:async\s+)?(?:unsafe\s+)?(?:extern\s+"[^"]+"\s+)?fn\s+([A-Za-z_][A-Za-z0-9_]*)\s*\((.*)\)\s*(?:->\s*(.+))?$/,
-           signature
-         ) do
-      [_, name, args] ->
-        {:ok, %{name: name, args: parse_args(args), return: nil}}
+    captures =
+      Regex.named_captures(
+        ~r/^(?:pub(?:\([^)]*\))?\s+)?(?<async>async\s+)?(?:unsafe\s+)?(?:extern\s+"[^"]+"\s+)?fn\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\s*\((?<args>.*)\)\s*(?:->\s*(?<return>.+))?$/,
+        signature
+      )
 
-      [_, name, args, return_type] ->
-        {:ok, %{name: name, args: parse_args(args), return: normalize_return(return_type)}}
+    case captures do
+      %{"name" => name, "args" => args} = captures ->
+        {:ok,
+         %{
+           name: name,
+           args: parse_args(args),
+           return: normalize_return(captures["return"]),
+           async: captures["async"] != ""
+         }}
 
-      _other ->
+      nil ->
         :error
     end
   end
@@ -108,6 +119,9 @@ defmodule Exclosured.RPC.Parser do
     |> String.split(delimiter, parts: 2)
     |> hd()
   end
+
+  defp normalize_return(nil), do: nil
+  defp normalize_return(""), do: nil
 
   defp normalize_return(return_type) do
     return_type
