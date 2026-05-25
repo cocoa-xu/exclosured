@@ -6,8 +6,6 @@ defmodule Exclosured.TelemetryTest do
   setup do
     # Attach a handler that sends events to the test process
     ref = make_ref()
-    test_pid = self()
-
     handler_id = "test-handler-#{inspect(ref)}"
 
     :telemetry.attach_many(
@@ -22,14 +20,16 @@ defmodule Exclosured.TelemetryTest do
         [:exclosured, :wasm, :error],
         [:exclosured, :wasm, :ready]
       ],
-      fn event, measurements, metadata, _config ->
-        send(test_pid, {:telemetry, event, measurements, metadata})
-      end,
-      nil
+      &__MODULE__.handle_event/4,
+      self()
     )
 
     on_exit(fn -> :telemetry.detach(handler_id) end)
     :ok
+  end
+
+  def handle_event(event, measurements, metadata, test_pid) do
+    send(test_pid, {:telemetry, event, measurements, metadata})
   end
 
   describe "compile events" do

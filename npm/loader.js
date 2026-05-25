@@ -1,3 +1,3 @@
 "use strict";
-const { ExclosuredLoader } = require("./loader.mjs");
-module.exports = { ExclosuredLoader };
+const { ExclosuredLoader, WasmBuffer } = require("./loader.mjs");
+module.exports = { ExclosuredLoader, WasmBuffer };
