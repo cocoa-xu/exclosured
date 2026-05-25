@@ -290,6 +290,10 @@ def handle_info({:wasm_result, :my_module, "process", count}, socket) do
 end
 ```
 
+Exported functions may return either a plain value or a JavaScript `Promise`.
+The LiveView result message is sent after the promise resolves, and rejected
+promises arrive as `{:wasm_error, module, func, reason}`.
+
 ### LiveView Hooks in Rust
 
 Write DOM-interacting hooks entirely in Rust. JS becomes a thin shim:
