@@ -43,9 +43,11 @@ exclosured/
 │   │   ├── events/parser.ex      # Rust struct parser
 │   │   ├── protocol.ex           # Binary state sync protocol
 │   │   ├── telemetry.ex          # Telemetry events
+│   │   ├── doctor.ex             # Setup diagnostics used by mix exclosured.doctor
 │   │   └── watcher.ex            # Dev file watcher
 │   └── mix/tasks/
 │       ├── compile/exclosured.ex # Mix compiler
+│       ├── exclosured.doctor.ex  # Diagnostic task
 │       └── exclosured.init.ex    # Scaffolding task
 ├── native/
 │   └── exclosured_guest/         # Rust crate (published to crates.io)

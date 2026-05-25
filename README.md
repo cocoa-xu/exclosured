@@ -143,6 +143,15 @@ config :exclosured,
   ]
 ```
 
+### Check your setup
+
+Run the doctor task to verify the Rust toolchain, Exclosured config, WASM
+module sources, Phoenix static setup, and npm package wiring:
+
+```sh
+mix exclosured.doctor
+```
+
 #### Module options
 
 | Option | Default | Description |
