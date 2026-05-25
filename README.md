@@ -128,6 +128,25 @@ let liveSocket = new LiveSocket("/live", Socket, {
 mix exclosured.init --module my_filter
 ```
 
+Choose a starter template when the module has a specific role:
+
+```sh
+mix exclosured.init --module image_filter --template worker
+mix exclosured.init --module renderer --template canvas
+mix exclosured.init --module dom_hook --template liveview-hook
+mix exclosured.init --module pipeline --template typed-events
+```
+
+| Template | Use When | Config Hint |
+|---|---|---|
+| `default` | You need a small `compute/1` example. | `my_filter: []` |
+| `worker` | The module does compute-heavy work off the main thread. | `image_filter: [worker: true]` |
+| `canvas` | The module owns a browser canvas and receives synced state. | `renderer: [canvas: true]` |
+| `liveview-hook` | The module uses hook lifecycle exports such as `init/1`, `apply_state/1`, and `destroyed/0`. | `dom_hook: [canvas: true]` |
+| `typed-events` | Rust event structs should feed `Exclosured.Events` codegen. | `pipeline: []` |
+
+`basic` aliases `default`, and `hook` aliases `liveview-hook`.
+
 ### Configure
 
 ```elixir
