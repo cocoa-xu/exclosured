@@ -319,6 +319,12 @@ end
 to suppress any late result for that call. WASM modules can optionally export
 `cancel_call(ref)` for cooperative cancellation.
 
+When multiple sandbox instances are mounted on the same page, hook-managed guest
+callbacks from `exclosured_guest::emit/2` and `exclosured_guest::broadcast/2`
+are routed through the calling hook instance. Broadcast channels still use the
+shared browser-side bus, but receiving modules run their `on_broadcast` callback
+inside their own host context.
+
 ### LiveView Hooks in Rust
 
 Write DOM-interacting hooks entirely in Rust. JS becomes a thin shim:
