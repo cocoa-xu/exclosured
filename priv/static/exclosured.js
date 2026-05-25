@@ -64,8 +64,8 @@ const ExclosuredLoader = {
    */
   async load(jsUrl, wasmUrl) {
     const mod = await import(jsUrl);
-    await mod.default(wasmUrl);
-    return mod;
+    const wasmExports = (await mod.default(wasmUrl)) || {};
+    return Object.assign({}, wasmExports, mod);
   },
 
   /**

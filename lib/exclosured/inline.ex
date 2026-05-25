@@ -43,6 +43,10 @@ defmodule Exclosured.Inline do
     * `:binary`: allocated in WASM memory, passed as (ptr, len), mutable
     * `:string`: allocated in WASM memory, passed as (ptr, len), read-only
     * `:i32`, `:u32`, `:f32`, `:f64`: passed directly as WASM values
+
+  ## Supported Return Types
+
+    * `:i32`, `:u32`, `:f32`, `:f64`
   """
 
   defmacro __using__(_opts) do
@@ -88,7 +92,7 @@ defmodule Exclosured.Inline do
   ## Options
 
     * `:args` - keyword list of `name: type` (default: `[]`)
-    * `:return` - return type (default: `:i32`)
+    * `:return` - scalar return type (default: `:i32`)
     * `:deps` - list of extra Cargo dependencies as `{name, version}` tuples
       (default: `[]`). These are added to the generated `Cargo.toml`.
       Example: `deps: [{"serde", "1"}, {"serde_json", "1"}]`
@@ -329,12 +333,13 @@ defmodule Exclosured.Inline do
   defp generate_lib_rs(functions) do
     fn_code =
       functions
-      |> Enum.map(fn {name, args, _ret, rust_code, _deps} ->
+      |> Enum.map(fn {name, args, ret, rust_code, _deps} ->
         {params, setup} = build_ffi(args)
+        return_type = to_rust_return_type!(ret)
 
         """
         #[no_mangle]
-        pub extern "C" fn #{name}(#{params}) -> i32 {
+        pub extern "C" fn #{name}(#{params}) -> #{return_type} {
         #{setup}
         #{indent(rust_code, 4)}
         }
@@ -373,7 +378,7 @@ defmodule Exclosured.Inline do
       |> Enum.flat_map(fn
         {name, :binary} -> [{"#{name}_ptr", "*mut u8"}, {"#{name}_len", "usize"}]
         {name, :string} -> [{"#{name}_ptr", "*const u8"}, {"#{name}_len", "usize"}]
-        {name, type} -> [{"#{name}", to_rust_type(type)}]
+        {name, type} -> [{"#{name}", to_rust_arg_type!(type)}]
       end)
       |> Enum.map(fn {n, t} -> "#{n}: #{t}" end)
       |> Enum.join(", ")
@@ -396,10 +401,21 @@ defmodule Exclosured.Inline do
     {params, setup}
   end
 
-  defp to_rust_type(:i32), do: "i32"
-  defp to_rust_type(:u32), do: "u32"
-  defp to_rust_type(:f32), do: "f32"
-  defp to_rust_type(:f64), do: "f64"
+  defp to_rust_arg_type!(type) when type in [:i32, :u32, :f32, :f64] do
+    Atom.to_string(type)
+  end
+
+  defp to_rust_arg_type!(type) do
+    Mix.raise("Unsupported defwasm argument type: #{inspect(type)}")
+  end
+
+  defp to_rust_return_type!(type) when type in [:i32, :u32, :f32, :f64] do
+    Atom.to_string(type)
+  end
+
+  defp to_rust_return_type!(type) do
+    Mix.raise("Unsupported defwasm return type: #{inspect(type)}")
+  end
 
   defp indent(code, spaces) do
     pad = String.duplicate(" ", spaces)

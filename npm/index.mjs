@@ -52,13 +52,13 @@ export const ExclosuredHook = {
       const jsUrl = `/wasm/${name}/${name}.js`;
       const wasmUrl = `/wasm/${name}/${name}_bg.wasm`;
       const mod = await import(/* @vite-ignore */ jsUrl);
-      await mod.default(wasmUrl);
-      this.wasmBindgen = mod;
+      const wasmExports = (await mod.default(wasmUrl)) || {};
+      this.wasmBindgen = Object.assign({}, wasmExports, mod);
 
       // Initialize with canvas if the module exports an init function
-      if (mod.init) {
+      if (this.wasmBindgen.init) {
         const canvas = this.el.querySelector("canvas") || this._createCanvas();
-        mod.init(canvas);
+        this.wasmBindgen.init(canvas);
       }
 
       // State sync: LiveView -> WASM

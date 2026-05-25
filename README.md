@@ -192,6 +192,16 @@ defmodule MyApp.Math do
 end
 ```
 
+Declare numeric return types when the default `:i32` is not enough:
+
+```elixir
+defwasm :ratio, args: [a: :f64, b: :f64], return: :f64 do
+  ~RUST"""
+  a / b
+  """
+end
+```
+
 Multi-line Rust with the `~RUST` sigil:
 
 ```elixir

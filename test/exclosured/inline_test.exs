@@ -53,6 +53,28 @@ defmodule Exclosured.InlineTest do
     defwasm(:multiply, args: [a: :i32, b: :i32], do: ~RUST"a * b")
   end
 
+  defmodule TestReturnTypes do
+    use Exclosured.Inline
+
+    defwasm :as_u32, args: [x: :u32], return: :u32 do
+      ~RUST"""
+      x + 1
+      """
+    end
+
+    defwasm :half, args: [x: :f64], return: :f64 do
+      ~RUST"""
+      x / 2.0
+      """
+    end
+
+    defwasm :scale_f32, args: [x: :f32], return: :f32 do
+      ~RUST"""
+      x * 1.5
+      """
+    end
+  end
+
   describe "defwasm macro" do
     test "generates wasm_url/0" do
       assert TestFilters.wasm_url() ==
@@ -150,6 +172,32 @@ defmodule Exclosured.InlineTest do
     end
   end
 
+  describe "defwasm return types" do
+    test "compiles scalar return types" do
+      assert TestReturnTypes.wasm_exports() == [:as_u32, :half, :scale_f32]
+      assert File.exists?(TestReturnTypes.wasm_path())
+    end
+
+    test "generates Rust functions with declared return types" do
+      source = generated_source(TestReturnTypes)
+
+      assert source =~ ~S|pub extern "C" fn as_u32(x: u32) -> u32|
+      assert source =~ ~S|pub extern "C" fn half(x: f64) -> f64|
+      assert source =~ ~S|pub extern "C" fn scale_f32(x: f32) -> f32|
+    end
+
+    test "raises for unsupported return types" do
+      assert_raise Mix.Error, ~r/Unsupported defwasm return type: :string/, fn ->
+        Code.compile_string("""
+        defmodule Exclosured.InlineTest.BadReturn do
+          use Exclosured.Inline
+          defwasm :bad, return: :string, do: ~RUST|String::from("nope")|
+        end
+        """)
+      end
+    end
+  end
+
   describe "deps with features" do
     test "generates correct Cargo.toml with features" do
       # The deps format {"name", "version", features: [...]} should produce
@@ -210,5 +258,17 @@ defmodule Exclosured.InlineTest do
 
   defp format_dep({name, version}) do
     "#{name} = \"#{version}\""
+  end
+
+  defp generated_source(module) do
+    [
+      Mix.Project.build_path(),
+      "exclosured_inline",
+      module.wasm_module_name(),
+      "src",
+      "lib.rs"
+    ]
+    |> Path.join()
+    |> File.read!()
   end
 end
