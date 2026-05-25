@@ -143,6 +143,10 @@ defmodule StreamingDemoWeb.PrimeLive do
     {:noreply, socket}
   end
 
+  def handle_event("wasm:ready", %{"module" => "prime_sieve"}, socket) do
+    {:noreply, assign(socket, wasm_ready: true)}
+  end
+
   def handle_event(_, _, socket), do: {:noreply, socket}
 
   @impl true
