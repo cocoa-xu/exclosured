@@ -138,6 +138,7 @@ config :exclosured,
   optimize: :none,                    # :none | :size | :speed (requires wasm-opt)
   modules: [
     my_processor: [],                 # default options
+    analyzer: [worker: true],         # run compute calls in a Web Worker
     renderer: [canvas: true],         # auto-creates canvas in sandbox component
     shared: [lib: true]               # library crate, not compiled to .wasm
   ]
@@ -162,6 +163,7 @@ mix exclosured.doctor
 | `cargo_args` | `[]` | Extra arguments forwarded directly to `cargo build` |
 | `lib` | `false` | Library crate (not compiled to standalone `.wasm`) |
 | `canvas` | `false` | Enable canvas integration |
+| `worker` | `false` | Mark the module as Web Worker friendly |
 
 Example with all options (compiling SQLite C to WASM):
 
@@ -339,6 +341,24 @@ LiveView assigns flow to WASM automatically. No `push_event` calls:
 
 When `@speed` changes, the component re-renders and the hook pushes the new value to WASM's `apply_state()`.
 
+### Web Worker Mode
+
+For compute-heavy modules, run WASM off the browser's main thread by setting
+`worker: true` in module config or passing `worker` to the sandbox component:
+
+```heex
+<Exclosured.LiveView.sandbox
+  module={:processor}
+  sync={%{threshold: @threshold}}
+  worker
+/>
+```
+
+The LiveView protocol stays the same: `call/5`, `push_state/3`, `stream_call/5`,
+`emit()`, `broadcast()`, results, and errors use the same event shapes. Worker
+mode is intended for compute modules and does not pass DOM canvas elements to
+Rust `init()`; keep canvas and DOM hooks on the main thread for now.
+
 ### Streaming Results
 
 WASM emits incremental chunks, LiveView accumulates:
@@ -441,6 +461,7 @@ If your app uses Content Security Policy, add:
 
 ```
 script-src 'wasm-unsafe-eval';
+worker-src blob:;
 ```
 
 ### Precompiled distribution

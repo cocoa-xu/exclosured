@@ -42,6 +42,7 @@ defmodule Exclosured.ConfigTest do
       my_mod = Exclosured.Config.module_config(config, :my_mod)
       assert my_mod.name == :my_mod
       assert my_mod.canvas == false
+      assert my_mod.worker == false
       assert my_mod.features == []
 
       heavy = Exclosured.Config.module_config(config, :heavy)
@@ -174,6 +175,15 @@ defmodule Exclosured.ConfigTest do
       assert mod.cargo_args == []
       assert mod.lib == false
       assert mod.canvas == false
+      assert mod.worker == false
+    end
+
+    test "parses worker option" do
+      Application.put_env(:exclosured, :modules, processor: [worker: true])
+
+      config = Exclosured.Config.read()
+      mod = Exclosured.Config.module_config(config, :processor)
+      assert mod.worker == true
     end
   end
 end

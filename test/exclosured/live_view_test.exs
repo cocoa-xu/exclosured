@@ -2,6 +2,11 @@ defmodule Exclosured.LiveViewTest do
   use ExUnit.Case
 
   alias Exclosured.LiveView
+  import Phoenix.LiveViewTest
+
+  setup do
+    on_exit(fn -> Application.delete_env(:exclosured, :modules) end)
+  end
 
   describe "sync/2" do
     test "same-name shorthand with atom list" do
@@ -138,6 +143,37 @@ defmodule Exclosured.LiveViewTest do
       assert_raise KeyError, ~r/on_chunk/, fn ->
         LiveView.stream_call(build_socket(), :mod, "func", [], on_done: fn s -> s end)
       end
+    end
+  end
+
+  describe "sandbox/1" do
+    test "renders worker mode data attribute when enabled" do
+      html = render_component(&LiveView.sandbox/1, module: :processor, worker: true)
+
+      assert html =~ ~s(data-wasm-module="processor")
+      assert html =~ ~s(data-wasm-worker="true")
+    end
+
+    test "omits worker mode data attribute by default" do
+      html = render_component(&LiveView.sandbox/1, module: :processor)
+
+      refute html =~ "data-wasm-worker"
+    end
+
+    test "uses worker mode from module config by default" do
+      Application.put_env(:exclosured, :modules, processor: [worker: true])
+
+      html = render_component(&LiveView.sandbox/1, module: :processor)
+
+      assert html =~ ~s(data-wasm-worker="true")
+    end
+
+    test "allows worker attr to override module config" do
+      Application.put_env(:exclosured, :modules, processor: [worker: true])
+
+      html = render_component(&LiveView.sandbox/1, module: :processor, worker: false)
+
+      refute html =~ "data-wasm-worker"
     end
   end
 
