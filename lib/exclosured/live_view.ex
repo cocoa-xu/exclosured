@@ -110,7 +110,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
         socket
         |> ensure_wasm_hook()
-        |> push_event("wasm:call", %{func: func, args: args, ref: ref})
+        |> push_event("wasm:call", %{module: module, func: func, args: args, ref: ref})
       end
     end
 
@@ -126,12 +126,12 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     @doc """
     Push a state update to a WASM module.
     """
-    def push_state(socket, _module, state) when is_map(state) do
-      push_event(socket, "wasm:state", state)
+    def push_state(socket, module, state) when is_atom(module) and is_map(state) do
+      push_event(socket, "wasm:state", %{module: module, state: state})
     end
 
-    def push_state(socket, _module, binary) when is_binary(binary) do
-      push_event(socket, "wasm:state", %{binary: binary})
+    def push_state(socket, module, binary) when is_atom(module) and is_binary(binary) do
+      push_event(socket, "wasm:state", %{module: module, binary: binary})
     end
 
     @doc """

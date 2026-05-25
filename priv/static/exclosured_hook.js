@@ -67,11 +67,16 @@ const ExclosuredHook = {
       }
 
       // State sync: LiveView -> WASM
-      this.handleEvent("wasm:state", (state) => {
+      this.handleEvent("wasm:state", (payload) => {
+        if (payload.module && payload.module !== name) return;
+
         if (this.wasmBindgen && this.wasmBindgen.apply_state) {
-          if (state.binary) {
-            this.wasmBindgen.apply_state(new Uint8Array(state.binary));
+          if (Object.prototype.hasOwnProperty.call(payload, "binary")) {
+            this.wasmBindgen.apply_state(new Uint8Array(payload.binary));
           } else {
+            const state = Object.prototype.hasOwnProperty.call(payload, "state")
+              ? payload.state
+              : payload;
             const encoder = new TextEncoder();
             const encoded = encoder.encode(JSON.stringify(state));
             this.wasmBindgen.apply_state(encoded);
@@ -80,7 +85,9 @@ const ExclosuredHook = {
       });
 
       // Handle RPC calls from LiveView
-      this.handleEvent("wasm:call", ({ func, args, ref }) => {
+      this.handleEvent("wasm:call", ({ module, func, args, ref }) => {
+        if (module && module !== name) return;
+
         try {
           const wasmFn = this.wasmBindgen[func];
           if (!wasmFn) throw new Error(`Function '${func}' not exported`);
