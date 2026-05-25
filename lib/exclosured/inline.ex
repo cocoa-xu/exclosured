@@ -230,7 +230,8 @@ defmodule Exclosured.Inline do
           "#{name} = \"#{version}\""
       end)
 
-    # Write Cargo.toml
+    wasm_bindgen_requirement = Exclosured.WasmBindgen.dependency_requirement()
+
     File.write!(Path.join(crate_dir, "Cargo.toml"), """
     [package]
     name = "#{module_name}"
@@ -241,7 +242,7 @@ defmodule Exclosured.Inline do
     crate-type = ["cdylib"]
 
     [dependencies]
-    wasm-bindgen = "0.2"
+    wasm-bindgen = "#{wasm_bindgen_requirement}"
     #{extra_deps_toml}
 
     [profile.release]

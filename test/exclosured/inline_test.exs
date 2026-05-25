@@ -81,6 +81,22 @@ defmodule Exclosured.InlineTest do
       path = TestFilters.wasm_path()
       assert String.starts_with?(path, "/")
     end
+
+    test "pins wasm-bindgen to the installed CLI version" do
+      {:ok, version} = Exclosured.WasmBindgen.cli_version()
+
+      cargo_toml =
+        [
+          Mix.Project.build_path(),
+          "exclosured_inline",
+          TestFilters.wasm_module_name(),
+          "Cargo.toml"
+        ]
+        |> Path.join()
+        |> File.read!()
+
+      assert cargo_toml =~ ~s(wasm-bindgen = "=#{version}")
+    end
   end
 
   describe "~RUST sigil" do

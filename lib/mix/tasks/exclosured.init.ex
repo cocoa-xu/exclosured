@@ -103,6 +103,8 @@ defmodule Mix.Tasks.Exclosured.Init do
   end
 
   defp module_cargo_toml(name) do
+    wasm_bindgen_requirement = Exclosured.WasmBindgen.dependency_requirement()
+
     """
     [package]
     name = "#{name}"
@@ -113,7 +115,7 @@ defmodule Mix.Tasks.Exclosured.Init do
     crate-type = ["cdylib"]
 
     [dependencies]
-    wasm-bindgen = "0.2"
+    wasm-bindgen = "#{wasm_bindgen_requirement}"
     exclosured_guest = "0.1"
     """
   end

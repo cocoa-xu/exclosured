@@ -65,7 +65,17 @@ defmodule Exclosured.Compiler do
   end
 
   defp check_wasm32_target do
-    case System.cmd("rustup", ["target", "list", "--installed"], stderr_to_stdout: true) do
+    case System.find_executable("rustup") do
+      nil ->
+        :ok
+
+      rustup ->
+        check_wasm32_target(rustup)
+    end
+  end
+
+  defp check_wasm32_target(rustup) do
+    case System.cmd(rustup, ["target", "list", "--installed"], stderr_to_stdout: true) do
       {output, 0} ->
         if String.contains?(output, "wasm32-unknown-unknown") do
           :ok
@@ -82,7 +92,6 @@ defmodule Exclosured.Compiler do
         end
 
       {_, _} ->
-        # rustup might not be available; try cargo build anyway
         :ok
     end
   end
