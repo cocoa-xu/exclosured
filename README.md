@@ -459,6 +459,29 @@ Exclosured.LiveView.sync(assigns, [:key1, :key2, renamed: :original_key])
 Exclosured.LiveView.stream_call(socket, :mod, "func", [args], on_chunk: ..., on_done: ...)
 ```
 
+### Testing WASM Flows
+
+Use `Exclosured.Test` in LiveView tests to drive WASM result paths without
+booting a browser. The helpers deliver the same `handle_info/2` messages your
+LiveView receives after Exclosured hook events:
+
+```elixir
+Exclosured.Test.ready(view, :processor)
+Exclosured.Test.result(view, :processor, "score", 42)
+Exclosured.Test.emit(view, :processor, "progress", %{"percent" => 50})
+Exclosured.Test.error(view, :processor, "score", "boom")
+```
+
+Correlated `call_async/5` messages include the ref:
+
+```elixir
+Exclosured.Test.result(view, ref, :processor, "score", 42)
+Exclosured.Test.error(view, ref, :processor, "score", :timeout)
+```
+
+Helpers return rendered HTML when passed a `Phoenix.LiveViewTest.View`; passing
+a pid sends the message and returns `:ok`.
+
 ### Typed Events
 
 ```rust
