@@ -200,12 +200,19 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     @doc """
     Push a state update to a WASM module.
+
+    Maps are JSON encoded by default. Pass `encoding: :binary` to encode the
+    state with `Exclosured.Protocol` before it reaches `apply_state()`.
     """
-    def push_state(socket, module, state) when is_atom(module) and is_map(state) do
-      push_event(socket, "wasm:state", %{module: module, state: state})
+    def push_state(socket, module, state, opts \\ [])
+
+    def push_state(socket, module, state, opts)
+        when is_atom(module) and is_map(state) and is_list(opts) do
+      encoding = opts |> Keyword.get(:encoding, :json) |> sync_encoding!()
+      push_event(socket, "wasm:state", encoded_state_payload(module, state, encoding))
     end
 
-    def push_state(socket, module, binary) when is_atom(module) and is_binary(binary) do
+    def push_state(socket, module, binary, []) when is_atom(module) and is_binary(binary) do
       push_event(socket, "wasm:state", %{module: module, binary: binary})
     end
 
@@ -292,6 +299,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       * `canvas` - Whether to include a canvas element (default: false)
       * `worker` - Whether to run the WASM module in a Web Worker.
         Defaults to the module's `:worker` config.
+      * `encoding` - Sync payload encoding, either `:json` or `:binary`
+        (default: `:json`)
       * `width` - Canvas width (default: 800)
       * `height` - Canvas height (default: 600)
       * `subscribe` - List of broadcast channels to subscribe to
@@ -302,6 +311,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     attr(:sync, :map, default: nil)
     attr(:canvas, :boolean, default: false)
     attr(:worker, :boolean, default: nil)
+    attr(:encoding, :atom, default: :json)
     attr(:width, :integer, default: 800)
     attr(:height, :integer, default: 600)
     attr(:subscribe, :list, default: [])
@@ -309,10 +319,12 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     def sandbox(assigns) do
       worker_enabled = worker_enabled?(assigns.module, assigns.worker)
+      sync_encoding = sync_encoding!(assigns.encoding)
 
       assigns =
         assigns
         |> assign(:worker_enabled, worker_enabled)
+        |> assign(:sync_encoding, Atom.to_string(sync_encoding))
         |> assign_new(:element_id, fn -> "wasm-#{assigns.module}" end)
         |> assign_new(:subscribe_str, fn ->
           case assigns.subscribe do
@@ -320,12 +332,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             channels -> Enum.join(channels, ",")
           end
         end)
-        |> assign_new(:sync_json, fn ->
-          case assigns.sync do
-            nil -> nil
-            map when is_map(map) -> Jason.encode!(map)
-          end
-        end)
+        |> assign(:sync_payload, encode_sync_payload(assigns.sync, sync_encoding))
 
       ~H"""
       <div
@@ -334,7 +341,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         data-wasm-module={@module}
         data-wasm-worker={if @worker_enabled, do: "true"}
         data-wasm-subscribe={@subscribe_str}
-        data-wasm-sync={@sync_json}
+        data-wasm-sync={@sync_payload}
+        data-wasm-sync-encoding={if @sync_payload, do: @sync_encoding}
         data-wasm-width={if @canvas, do: @width}
         data-wasm-height={if @canvas, do: @height}
         class={@class}
@@ -357,6 +365,34 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         _other ->
           false
       end
+    end
+
+    defp sync_encoding!(encoding) when encoding in [:json, :binary], do: encoding
+
+    defp sync_encoding!(encoding) do
+      raise ArgumentError, "unsupported Exclosured sync encoding: #{inspect(encoding)}"
+    end
+
+    defp encode_sync_payload(nil, _encoding), do: nil
+    defp encode_sync_payload(map, :json) when is_map(map), do: Jason.encode!(map)
+
+    defp encode_sync_payload(map, :binary) when is_map(map) do
+      map
+      |> Exclosured.Protocol.encode()
+      |> Base.encode64()
+    end
+
+    defp encoded_state_payload(module, state, :json) do
+      %{module: module, state: state}
+    end
+
+    defp encoded_state_payload(module, state, :binary) do
+      %{
+        module: module,
+        binary: encode_sync_payload(state, :binary),
+        binary_encoding: "base64",
+        encoding: "binary"
+      }
     end
 
     defp ensure_wasm_hook(socket) do
