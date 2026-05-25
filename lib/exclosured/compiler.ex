@@ -67,7 +67,17 @@ defmodule Exclosured.Compiler do
   defp check_wasm32_target do
     case System.find_executable("rustup") do
       nil ->
-        :ok
+        Mix.raise("""
+        `rustup` not found in PATH.
+
+        Exclosured needs Rustup to verify the wasm32-unknown-unknown target.
+
+        Install Rust and Cargo:
+
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+
+        Then restart your shell and try again.
+        """)
 
       rustup ->
         check_wasm32_target(rustup)
