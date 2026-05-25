@@ -9,10 +9,109 @@
  *   });
  */
 
-// Global message bus for inter-module communication
-if (typeof window !== "undefined") {
+const RUNTIME_KEY = "__exclosured_runtime";
+const DISPATCHER_MARKER = "__exclosured_dispatcher";
+
+function getExclosuredBus() {
+  if (typeof window === "undefined") return null;
   window.__exclosured_bus = window.__exclosured_bus || new EventTarget();
+  return window.__exclosured_bus;
 }
+
+function getExclosuredRuntime() {
+  if (typeof window === "undefined") return null;
+
+  window[RUNTIME_KEY] = window[RUNTIME_KEY] || {
+    contexts: new Map(),
+    contextStack: [],
+    nextId: 1,
+    lastContextId: null,
+  };
+
+  if (
+    !window.__exclosured ||
+    window.__exclosured[DISPATCHER_MARKER] !== true
+  ) {
+    window.__exclosured = createHostDispatcher(window[RUNTIME_KEY]);
+  }
+
+  getExclosuredBus();
+  return window[RUNTIME_KEY];
+}
+
+function createHostDispatcher(runtime) {
+  return {
+    [DISPATCHER_MARKER]: true,
+
+    emit_event(event, payload) {
+      const context = activeHostContext(runtime);
+
+      if (!context) {
+        console.error("Exclosured: no active host context for emit_event");
+        return;
+      }
+
+      context.emitEvent(event, payload);
+    },
+
+    broadcast_event(channel, data) {
+      const context = activeHostContext(runtime);
+
+      if (context) {
+        context.broadcastEvent(channel, data);
+      } else {
+        dispatchBroadcast(channel, data);
+      }
+    },
+  };
+}
+
+function activeHostContext(runtime) {
+  const id =
+    runtime.contextStack[runtime.contextStack.length - 1] ||
+    runtime.lastContextId;
+
+  return id ? runtime.contexts.get(id) : null;
+}
+
+function withHostContext(context, callback) {
+  const runtime = getExclosuredRuntime();
+  if (!runtime || !context) return callback();
+
+  runtime.contextStack.push(context.id);
+  runtime.lastContextId = context.id;
+
+  let result;
+
+  try {
+    result = callback();
+  } catch (error) {
+    removeHostContextFrame(runtime, context.id);
+    throw error;
+  }
+
+  if (result && typeof result.then === "function") {
+    return Promise.resolve(result).finally(() => {
+      removeHostContextFrame(runtime, context.id);
+    });
+  }
+
+  removeHostContextFrame(runtime, context.id);
+  return result;
+}
+
+function removeHostContextFrame(runtime, id) {
+  const index = runtime.contextStack.lastIndexOf(id);
+  if (index !== -1) runtime.contextStack.splice(index, 1);
+}
+
+function dispatchBroadcast(channel, data) {
+  const bus = getExclosuredBus();
+  if (!bus) return;
+  bus.dispatchEvent(new CustomEvent(channel, { detail: data }));
+}
+
+getExclosuredRuntime();
 
 const WORKER_SOURCE = `
 let wasmModule = null;
@@ -165,6 +264,9 @@ export const ExclosuredHook = {
     this._workerMode = this._workerEnabled();
     this._wasmReady = false;
     this._canceledCalls = new Set();
+    this._hostContext = this._workerMode
+      ? null
+      : this._registerHostContext(name);
 
     try {
       if (this._workerMode) {
@@ -199,6 +301,7 @@ export const ExclosuredHook = {
       // Notify server that WASM is ready
       this.pushEvent("wasm:ready", { module: name });
     } catch (err) {
+      this._unregisterHostContext();
       console.error(`Exclosured: failed to load module '${name}'`, err);
       if (!err._exclosuredReported) {
         this.pushEvent("wasm:error", {
@@ -211,36 +314,16 @@ export const ExclosuredHook = {
   },
 
   async _mountMainThread(name) {
-    // Set up the global namespace for wasm-bindgen imported functions
-    window.__exclosured = {
-      emit_event: (event, payload) => {
-        try {
-          this.pushEvent("wasm:emit", {
-            module: name,
-            event: event,
-            payload: JSON.parse(payload),
-          });
-        } catch (e) {
-          console.error("Exclosured: invalid JSON in emit payload", e);
-        }
-      },
-
-      broadcast_event: (channel, data) => {
-        window.__exclosured_bus.dispatchEvent(
-          new CustomEvent(channel, { detail: data })
-        );
-      },
-    };
-
     const jsUrl = `/wasm/${name}/${name}.js`;
     const wasmUrl = `/wasm/${name}/${name}_bg.wasm`;
     const mod = await import(/* @vite-ignore */ jsUrl);
-    const wasmExports = (await mod.default(wasmUrl)) || {};
+    const wasmExports =
+      (await this._withHostContext(() => mod.default(wasmUrl))) || {};
     this.wasmBindgen = Object.assign({}, wasmExports, mod);
 
     if (this.wasmBindgen.init) {
       const canvas = this.el.querySelector("canvas") || this._createCanvas();
-      this.wasmBindgen.init(canvas);
+      await this._withHostContext(() => this.wasmBindgen.init(canvas));
     }
 
     this._wasmReady = true;
@@ -301,9 +384,7 @@ export const ExclosuredHook = {
             break;
 
           case "broadcast":
-            window.__exclosured_bus.dispatchEvent(
-              new CustomEvent(message.channel, { detail: message.data })
-            );
+            dispatchBroadcast(message.channel, message.data);
             break;
 
           case "error":
@@ -357,7 +438,7 @@ export const ExclosuredHook = {
       if (this._workerMode) {
         this._worker.postMessage({ type: "state", binary }, [binary.buffer]);
       } else if (this.wasmBindgen && this.wasmBindgen.apply_state) {
-        this.wasmBindgen.apply_state(binary);
+        this._withHostContext(() => this.wasmBindgen.apply_state(binary));
       }
     } else {
       const state = Object.prototype.hasOwnProperty.call(payload, "state")
@@ -368,7 +449,7 @@ export const ExclosuredHook = {
         this._worker.postMessage({ type: "state", state });
       } else if (this.wasmBindgen && this.wasmBindgen.apply_state) {
         const encoded = new TextEncoder().encode(JSON.stringify(state));
-        this.wasmBindgen.apply_state(encoded);
+        this._withHostContext(() => this.wasmBindgen.apply_state(encoded));
       }
     }
   },
@@ -382,7 +463,7 @@ export const ExclosuredHook = {
     try {
       const fn = this.wasmBindgen[func];
       if (!fn) throw new Error(`Function '${func}' not exported`);
-      const result = await fn(...args);
+      const result = await this._withHostContext(() => fn(...args));
       if (!this._wasmReady || this._consumeCanceledCall(ref)) return;
       this.pushEvent("wasm:result", {
         ref: ref,
@@ -412,7 +493,7 @@ export const ExclosuredHook = {
       typeof this.wasmBindgen.cancel_call === "function"
     ) {
       try {
-        this.wasmBindgen.cancel_call(ref);
+        this._withHostContext(() => this.wasmBindgen.cancel_call(ref));
       } catch (e) {
         console.error("Exclosured: cancel_call failed", e);
       }
@@ -423,6 +504,56 @@ export const ExclosuredHook = {
     if (ref == null || !this._canceledCalls.has(ref)) return false;
     this._canceledCalls.delete(ref);
     return true;
+  },
+
+  _registerHostContext(name) {
+    const runtime = getExclosuredRuntime();
+    if (!runtime) return null;
+
+    const id = `${name}:${runtime.nextId++}`;
+    const context = {
+      id,
+      name,
+      emitEvent: (event, payload) => this._emitFromGuest(event, payload),
+      broadcastEvent: (channel, data) => dispatchBroadcast(channel, data),
+    };
+
+    runtime.contexts.set(id, context);
+    runtime.lastContextId = id;
+    return context;
+  },
+
+  _unregisterHostContext() {
+    const runtime = getExclosuredRuntime();
+    const context = this._hostContext;
+    if (!runtime || !context) return;
+
+    runtime.contexts.delete(context.id);
+    runtime.contextStack = runtime.contextStack.filter(
+      (id) => id !== context.id
+    );
+
+    if (runtime.lastContextId === context.id) {
+      runtime.lastContextId = Array.from(runtime.contexts.keys()).pop() || null;
+    }
+
+    this._hostContext = null;
+  },
+
+  _withHostContext(callback) {
+    return withHostContext(this._hostContext, callback);
+  },
+
+  _emitFromGuest(event, payload) {
+    try {
+      this.pushEvent("wasm:emit", {
+        module: this._name,
+        event: event,
+        payload: JSON.parse(payload),
+      });
+    } catch (e) {
+      console.error("Exclosured: invalid JSON in emit payload", e);
+    }
   },
 
   // Declarative state sync: when LiveView re-renders with new sync data
@@ -459,10 +590,12 @@ export const ExclosuredHook = {
             data: e.detail,
           });
         } else if (this.wasmBindgen && this.wasmBindgen.on_broadcast) {
-          this.wasmBindgen.on_broadcast(channel, e.detail);
+          this._withHostContext(() =>
+            this.wasmBindgen.on_broadcast(channel, e.detail)
+          );
         }
       };
-      window.__exclosured_bus.addEventListener(channel, handler);
+      getExclosuredBus().addEventListener(channel, handler);
       this._subscriptions.push({ channel, handler });
     });
   },
@@ -477,23 +610,29 @@ export const ExclosuredHook = {
 
   destroyed() {
     this._subscriptions.forEach(({ channel, handler }) => {
-      window.__exclosured_bus.removeEventListener(channel, handler);
+      getExclosuredBus().removeEventListener(channel, handler);
     });
     this._subscriptions = [];
-    if (this._worker) {
-      this._worker.postMessage({ type: "destroy" });
-      this._worker.terminate();
-      this._worker = null;
-    } else if (
-      this.wasmBindgen &&
-      typeof this.wasmBindgen.destroyed === "function"
-    ) {
-      try {
-        this.wasmBindgen.destroyed();
-      } catch (e) {
-        console.error("Exclosured: error in WASM destroyed() callback", e);
+
+    try {
+      if (this._worker) {
+        this._worker.postMessage({ type: "destroy" });
+        this._worker.terminate();
+        this._worker = null;
+      } else if (
+        this.wasmBindgen &&
+        typeof this.wasmBindgen.destroyed === "function"
+      ) {
+        try {
+          this._withHostContext(() => this.wasmBindgen.destroyed());
+        } catch (e) {
+          console.error("Exclosured: error in WASM destroyed() callback", e);
+        }
       }
+    } finally {
+      this._unregisterHostContext();
     }
+
     this.wasmBindgen = null;
     this._wasmReady = false;
   },
