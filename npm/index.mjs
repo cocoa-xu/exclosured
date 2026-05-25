@@ -30,7 +30,7 @@ self.onmessage = async (event) => {
         applyState(message);
         break;
       case "call":
-        callWasm(message);
+        await callWasm(message);
         break;
       case "broadcast":
         onBroadcast(message);
@@ -87,15 +87,16 @@ function applyState(message) {
   }
 }
 
-function callWasm({ func, args, ref }) {
+async function callWasm({ func, args, ref }) {
   const wasmFn = wasmModule && wasmModule[func];
   if (!wasmFn) throw new Error(\`Function '\${func}' not exported\`);
+  const result = await wasmFn(...args);
 
   self.postMessage({
     type: "result",
     ref,
     func,
-    result: wasmFn(...args),
+    result,
   });
 }
 
@@ -339,7 +340,7 @@ export const ExclosuredHook = {
     }
   },
 
-  _callWasm(func, args, ref) {
+  async _callWasm(func, args, ref) {
     if (this._workerMode) {
       this._worker.postMessage({ type: "call", func, args, ref });
       return;
@@ -348,7 +349,8 @@ export const ExclosuredHook = {
     try {
       const fn = this.wasmBindgen[func];
       if (!fn) throw new Error(`Function '${func}' not exported`);
-      const result = fn(...args);
+      const result = await fn(...args);
+      if (!this._wasmReady) return;
       this.pushEvent("wasm:result", {
         ref: ref,
         module: this._name,
@@ -356,6 +358,7 @@ export const ExclosuredHook = {
         result: result,
       });
     } catch (e) {
+      if (!this._wasmReady) return;
       this.pushEvent("wasm:error", {
         ref: ref,
         module: this._name,
