@@ -17,6 +17,7 @@ if (typeof window !== "undefined") {
 const WORKER_SOURCE = `
 let wasmModule = null;
 const encoder = new TextEncoder();
+const canceledCalls = new Set();
 
 self.onmessage = async (event) => {
   const message = event.data || {};
@@ -31,6 +32,9 @@ self.onmessage = async (event) => {
         break;
       case "call":
         await callWasm(message);
+        break;
+      case "cancel":
+        cancelCall(message);
         break;
       case "broadcast":
         onBroadcast(message);
@@ -92,12 +96,33 @@ async function callWasm({ func, args, ref }) {
   if (!wasmFn) throw new Error(\`Function '\${func}' not exported\`);
   const result = await wasmFn(...args);
 
+  if (consumeCanceledCall(ref)) return;
+
   self.postMessage({
     type: "result",
     ref,
     func,
     result,
   });
+}
+
+function cancelCall({ ref }) {
+  if (ref == null) return;
+  canceledCalls.add(ref);
+
+  if (wasmModule && typeof wasmModule.cancel_call === "function") {
+    try {
+      wasmModule.cancel_call(ref);
+    } catch (error) {
+      console.error("Exclosured: cancel_call failed", error);
+    }
+  }
+}
+
+function consumeCanceledCall(ref) {
+  if (ref == null || !canceledCalls.has(ref)) return false;
+  canceledCalls.delete(ref);
+  return true;
 }
 
 function onBroadcast({ channel, data }) {
@@ -114,6 +139,8 @@ function destroy() {
 }
 
 function postError(ref, func, error) {
+  if (consumeCanceledCall(ref)) return;
+
   self.postMessage({
     type: "error",
     ref,
@@ -137,6 +164,7 @@ export const ExclosuredHook = {
     this._worker = null;
     this._workerMode = this._workerEnabled();
     this._wasmReady = false;
+    this._canceledCalls = new Set();
 
     try {
       if (this._workerMode) {
@@ -155,6 +183,11 @@ export const ExclosuredHook = {
       this.handleEvent("wasm:call", ({ module, func, args, ref }) => {
         if (module && module !== name) return;
         this._callWasm(func, args, ref);
+      });
+
+      this.handleEvent("wasm:cancel", ({ module, ref }) => {
+        if (module && module !== name) return;
+        this._cancelWasmCall(ref);
       });
 
       // Set up inter-module subscriptions
@@ -350,7 +383,7 @@ export const ExclosuredHook = {
       const fn = this.wasmBindgen[func];
       if (!fn) throw new Error(`Function '${func}' not exported`);
       const result = await fn(...args);
-      if (!this._wasmReady) return;
+      if (!this._wasmReady || this._consumeCanceledCall(ref)) return;
       this.pushEvent("wasm:result", {
         ref: ref,
         module: this._name,
@@ -358,7 +391,7 @@ export const ExclosuredHook = {
         result: result,
       });
     } catch (e) {
-      if (!this._wasmReady) return;
+      if (!this._wasmReady || this._consumeCanceledCall(ref)) return;
       this.pushEvent("wasm:error", {
         ref: ref,
         module: this._name,
@@ -366,6 +399,30 @@ export const ExclosuredHook = {
         error: e.message,
       });
     }
+  },
+
+  _cancelWasmCall(ref) {
+    if (ref == null) return;
+    this._canceledCalls.add(ref);
+
+    if (this._workerMode) {
+      this._worker.postMessage({ type: "cancel", ref });
+    } else if (
+      this.wasmBindgen &&
+      typeof this.wasmBindgen.cancel_call === "function"
+    ) {
+      try {
+        this.wasmBindgen.cancel_call(ref);
+      } catch (e) {
+        console.error("Exclosured: cancel_call failed", e);
+      }
+    }
+  },
+
+  _consumeCanceledCall(ref) {
+    if (ref == null || !this._canceledCalls.has(ref)) return false;
+    this._canceledCalls.delete(ref);
+    return true;
   },
 
   // Declarative state sync: when LiveView re-renders with new sync data

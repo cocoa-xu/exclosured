@@ -294,6 +294,31 @@ Exported functions may return either a plain value or a JavaScript `Promise`.
 The LiveView result message is sent after the promise resolves, and rejected
 promises arrive as `{:wasm_error, module, func, reason}`.
 
+Use `call_async/5` when you need to correlate concurrent calls:
+
+```elixir
+def handle_event("analyze", %{"text" => text}, socket) do
+  {:ok, ref, socket} =
+    Exclosured.LiveView.call_async(socket, :my_module, "process", [text],
+      timeout: 5_000
+    )
+
+  {:noreply, assign(socket, active_ref: ref)}
+end
+
+def handle_info({:wasm_result, ref, :my_module, "process", count}, socket) do
+  {:noreply, assign(socket, active_ref: ref, word_count: count)}
+end
+
+def handle_info({:wasm_error, ref, :my_module, "process", :timeout}, socket) do
+  {:noreply, assign(socket, active_ref: ref, error: "WASM call timed out")}
+end
+```
+
+`cancel_call/2` cancels a pending `call_async/5` ref and asks the browser hook
+to suppress any late result for that call. WASM modules can optionally export
+`cancel_call(ref)` for cooperative cancellation.
+
 ### LiveView Hooks in Rust
 
 Write DOM-interacting hooks entirely in Rust. JS becomes a thin shim:
