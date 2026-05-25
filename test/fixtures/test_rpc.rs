@@ -30,6 +30,12 @@ pub fn version() -> String {
     "1.0.0".to_string()
 }
 
+/// exclosured:rpc
+#[wasm_bindgen]
+pub async fn fetch_score(input: String) -> u32 {
+    input.len() as u32
+}
+
 #[wasm_bindgen]
 pub fn internal(value: u32) -> u32 {
     value
