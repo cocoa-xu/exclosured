@@ -215,6 +215,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         When any value in the map changes between renders, the component
         pushes the entire sync map to the WASM module via `wasm:state`.
       * `canvas` - Whether to include a canvas element (default: false)
+      * `worker` - Whether to run the WASM module in a Web Worker.
+        Defaults to the module's `:worker` config.
       * `width` - Canvas width (default: 800)
       * `height` - Canvas height (default: 600)
       * `subscribe` - List of broadcast channels to subscribe to
@@ -224,14 +226,18 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     attr(:id, :string, default: nil)
     attr(:sync, :map, default: nil)
     attr(:canvas, :boolean, default: false)
+    attr(:worker, :boolean, default: nil)
     attr(:width, :integer, default: 800)
     attr(:height, :integer, default: 600)
     attr(:subscribe, :list, default: [])
     attr(:class, :string, default: nil)
 
     def sandbox(assigns) do
+      worker_enabled = worker_enabled?(assigns.module, assigns.worker)
+
       assigns =
         assigns
+        |> assign(:worker_enabled, worker_enabled)
         |> assign_new(:element_id, fn -> "wasm-#{assigns.module}" end)
         |> assign_new(:subscribe_str, fn ->
           case assigns.subscribe do
@@ -251,6 +257,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         id={@id || @element_id}
         phx-hook="Exclosured"
         data-wasm-module={@module}
+        data-wasm-worker={if @worker_enabled, do: "true"}
         data-wasm-subscribe={@subscribe_str}
         data-wasm-sync={@sync_json}
         data-wasm-width={if @canvas, do: @width}
@@ -260,6 +267,21 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         <canvas :if={@canvas} width={@width} height={@height}></canvas>
       </div>
       """
+    end
+
+    defp worker_enabled?(_module, worker) when is_boolean(worker), do: worker
+
+    defp worker_enabled?(module, nil) do
+      case Application.get_env(:exclosured, :modules, []) do
+        modules when is_list(modules) ->
+          Enum.find_value(modules, false, fn
+            {^module, opts} when is_list(opts) -> Keyword.get(opts, :worker, false)
+            _other -> false
+          end)
+
+        _other ->
+          false
+      end
     end
 
     defp ensure_wasm_hook(socket) do
