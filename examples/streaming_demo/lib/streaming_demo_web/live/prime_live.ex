@@ -19,6 +19,11 @@ defmodule StreamingDemoWeb.PrimeLive do
   @impl true
   def render(assigns) do
     ~H"""
+    <nav class="demo-nav">
+      <span>Streaming primes</span>
+      <a href="/worker">Worker comparison</a>
+    </nav>
+
     <h1>Prime Number Finder</h1>
     <p class="subtitle">
       Streaming results from WASM: each batch of primes arrives via
@@ -136,6 +141,10 @@ defmodule StreamingDemoWeb.PrimeLive do
       )
 
     {:noreply, socket}
+  end
+
+  def handle_event("wasm:ready", %{"module" => "prime_sieve"}, socket) do
+    {:noreply, assign(socket, wasm_ready: true)}
   end
 
   def handle_event(_, _, socket), do: {:noreply, socket}

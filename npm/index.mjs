@@ -111,6 +111,10 @@ function dispatchBroadcast(channel, data) {
   bus.dispatchEvent(new CustomEvent(channel, { detail: data }));
 }
 
+function wasmAssetUrl(name, file) {
+  return new URL(`/wasm/${name}/${file}`, window.location.href).href;
+}
+
 function bytesFromPayload(value, encoding) {
   if (value instanceof Uint8Array) return value;
   if (value instanceof ArrayBuffer) return new Uint8Array(value);
@@ -361,8 +365,8 @@ export const ExclosuredHook = {
   },
 
   async _mountMainThread(name) {
-    const jsUrl = `/wasm/${name}/${name}.js`;
-    const wasmUrl = `/wasm/${name}/${name}_bg.wasm`;
+    const jsUrl = wasmAssetUrl(name, `${name}.js`);
+    const wasmUrl = wasmAssetUrl(name, `${name}_bg.wasm`);
     const mod = await import(/* @vite-ignore */ jsUrl);
     const wasmExports =
       (await this._withHostContext(() => mod.default(wasmUrl))) || {};
@@ -383,8 +387,8 @@ export const ExclosuredHook = {
       );
     }
 
-    const jsUrl = `/wasm/${name}/${name}.js`;
-    const wasmUrl = `/wasm/${name}/${name}_bg.wasm`;
+    const jsUrl = wasmAssetUrl(name, `${name}.js`);
+    const wasmUrl = wasmAssetUrl(name, `${name}_bg.wasm`);
 
     await new Promise((resolve, reject) => {
       const worker = this._createWorker(name);

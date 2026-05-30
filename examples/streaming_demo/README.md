@@ -6,6 +6,10 @@
 
 A WASM module scans a number range for primes in batches. Each batch of discovered primes is emitted as a `"chunk"` event via `exclosured::emit()`. The LiveView accumulates results using `Exclosured.LiveView.stream_call`, which handles the chunk/done lifecycle with simple callbacks.
 
+The `/worker` page compares the same CPU-bound WASM loop on the browser main
+thread and in Web Worker mode. A frame meter makes the responsiveness difference
+visible while each run is active.
+
 This demo uses a **full Cargo workspace** with the `exclosured_guest` crate for `emit()`.
 
 ## The Key Pattern: `stream_call`
@@ -79,3 +83,18 @@ Exclosured.LiveView.stream_call(socket, :prime_sieve, "find_primes", [max_n],
 ```
 
 One call, two callbacks, automatic cleanup.
+
+## Worker Mode Comparison
+
+Open `/worker` after starting the app. The page mounts two equivalent WASM
+modules:
+
+```heex
+<Exclosured.LiveView.sandbox module={:cpu_main} />
+<Exclosured.LiveView.sandbox module={:cpu_worker} worker />
+```
+
+Both buttons call `burn/1` through `Exclosured.LiveView.call_async/5`. The main
+thread run blocks rendering until the loop returns, so the frame meter freezes.
+The worker run uses the same result and emit message shapes, but computation
+happens off the UI thread.

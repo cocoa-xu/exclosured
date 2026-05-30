@@ -30,7 +30,9 @@ config :esbuild,
 
 config :exclosured,
   modules: [
-    prime_sieve: []
+    prime_sieve: [],
+    cpu_main: [],
+    cpu_worker: [worker: true]
   ]
 
 config :logger, level: :info
