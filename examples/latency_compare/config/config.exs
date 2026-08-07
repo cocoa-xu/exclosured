@@ -8,17 +8,22 @@ config :latency_compare, LatencyCompareWeb.Endpoint,
   live_view: [signing_salt: "latency_dev_salt"],
   secret_key_base: String.duplicate("latency_dev_secret", 4),
   http: [port: 4007],
-  server: true,
-  watchers: [
-    esbuild: {Esbuild, :install_and_run, [:latency_compare, ~w(--sourcemap=inline --watch)]}
-  ],
-  live_reload: [
-    patterns: [
-      ~r"priv/static/assets/.*(js|css)$",
-      ~r"priv/static/wasm/.*(wasm|js)$",
-      ~r"lib/latency_compare_web/(live|components)/.*(ex|heex)$"
+  server: true
+
+# Releases cannot serialise regexes, so these have to stay out of :prod.
+if config_env() == :dev do
+  config :latency_compare, LatencyCompareWeb.Endpoint,
+    watchers: [
+      esbuild: {Esbuild, :install_and_run, [:latency_compare, ~w(--sourcemap=inline --watch)]}
+    ],
+    live_reload: [
+      patterns: [
+        ~r"priv/static/assets/.*(js|css)$",
+        ~r"priv/static/wasm/.*(wasm|js)$",
+        ~r"lib/latency_compare_web/(live|components)/.*(ex|heex)$"
+      ]
     ]
-  ]
+end
 
 config :esbuild,
   version: "0.25.0",
