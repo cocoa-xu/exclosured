@@ -8,17 +8,22 @@ config :matrix_mul, MatrixMulWeb.Endpoint,
   live_view: [signing_salt: "matrix_dev_salt"],
   secret_key_base: String.duplicate("matrix_dev_secret_key_", 4),
   http: [port: 4015],
-  server: true,
-  watchers: [
-    esbuild: {Esbuild, :install_and_run, [:matrix_mul, ~w(--sourcemap=inline --watch)]}
-  ],
-  live_reload: [
-    patterns: [
-      ~r"priv/static/assets/.*(js|css)$",
-      ~r"priv/static/wasm/.*(wasm|js)$",
-      ~r"lib/matrix_mul_web/(live|components)/.*(ex|heex)$"
+  server: true
+
+# Releases cannot serialise regexes, so these have to stay out of :prod.
+if config_env() == :dev do
+  config :matrix_mul, MatrixMulWeb.Endpoint,
+    watchers: [
+      esbuild: {Esbuild, :install_and_run, [:matrix_mul, ~w(--sourcemap=inline --watch)]}
+    ],
+    live_reload: [
+      patterns: [
+        ~r"priv/static/assets/.*(js|css)$",
+        ~r"priv/static/wasm/.*(wasm|js)$",
+        ~r"lib/matrix_mul_web/(live|components)/.*(ex|heex)$"
+      ]
     ]
-  ]
+end
 
 config :esbuild,
   version: "0.25.0",

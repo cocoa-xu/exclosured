@@ -8,17 +8,22 @@ config :live_vue_wasm, LiveVueWasmWeb.Endpoint,
   live_view: [signing_salt: "live_vue_wasm_salt"],
   secret_key_base: String.duplicate("live_vue_wasm_secret", 4),
   http: [port: 4012],
-  server: true,
-  watchers: [
-    npm: ["--silent", "run", "dev", cd: Path.expand("../assets", __DIR__)]
-  ],
-  live_reload: [
-    patterns: [
-      ~r"priv/static/(?!uploads/).*(js|css|wasm)$",
-      ~r"priv/static/wasm/.*(wasm|js)$",
-      ~r"lib/live_vue_wasm_web/(live|components)/.*(ex|heex)$"
+  server: true
+
+# Releases cannot serialise regexes, so these have to stay out of :prod.
+if config_env() == :dev do
+  config :live_vue_wasm, LiveVueWasmWeb.Endpoint,
+    watchers: [
+      npm: ["--silent", "run", "dev", cd: Path.expand("../assets", __DIR__)]
+    ],
+    live_reload: [
+      patterns: [
+        ~r"priv/static/(?!uploads/).*(js|css|wasm)$",
+        ~r"priv/static/wasm/.*(wasm|js)$",
+        ~r"lib/live_vue_wasm_web/(live|components)/.*(ex|heex)$"
+      ]
     ]
-  ]
+end
 
 config :live_vue,
   vite_host: "http://localhost:5173",

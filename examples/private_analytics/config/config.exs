@@ -8,19 +8,24 @@ config :private_analytics, PrivateAnalyticsWeb.Endpoint,
   live_view: [signing_salt: "private_analytics_dev_salt"],
   secret_key_base: String.duplicate("private_analytics_dev_secret", 4),
   http: [port: 4011],
-  server: true,
-  watchers: [
-    esbuild:
-      {Esbuild, :install_and_run,
-       [:private_analytics, ~w(--sourcemap=inline --watch)]}
-  ],
-  live_reload: [
-    patterns: [
-      ~r"priv/static/assets/.*(js|css)$",
-      ~r"priv/static/wasm/.*(wasm|js)$",
-      ~r"lib/private_analytics_web/(live|components)/.*(ex|heex)$"
+  server: true
+
+# Releases cannot serialise regexes, so these have to stay out of :prod.
+if config_env() == :dev do
+  config :private_analytics, PrivateAnalyticsWeb.Endpoint,
+    watchers: [
+      esbuild:
+        {Esbuild, :install_and_run,
+         [:private_analytics, ~w(--sourcemap=inline --watch)]}
+    ],
+    live_reload: [
+      patterns: [
+        ~r"priv/static/assets/.*(js|css)$",
+        ~r"priv/static/wasm/.*(wasm|js)$",
+        ~r"lib/private_analytics_web/(live|components)/.*(ex|heex)$"
+      ]
     ]
-  ]
+end
 
 config :esbuild,
   version: "0.25.0",

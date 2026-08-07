@@ -8,18 +8,23 @@ config :live_svelte_wasm, LiveSvelteWasmWeb.Endpoint,
   live_view: [signing_salt: "svelte_wasm_dev_salt"],
   secret_key_base: String.duplicate("svelte_wasm_dev_secret_", 4),
   http: [port: 4013],
-  server: true,
-  watchers: [
-    node: ["build.js", "--watch", cd: Path.expand("../assets", __DIR__)]
-  ],
-  live_reload: [
-    patterns: [
-      ~r"priv/static/assets/.*(js|css)$",
-      ~r"priv/static/wasm/.*(wasm|js)$",
-      ~r"lib/live_svelte_wasm_web/(live|components)/.*(ex|heex)$",
-      ~r"assets/svelte/.*(svelte)$"
+  server: true
+
+# Releases cannot serialise regexes, so these have to stay out of :prod.
+if config_env() == :dev do
+  config :live_svelte_wasm, LiveSvelteWasmWeb.Endpoint,
+    watchers: [
+      node: ["build.js", "--watch", cd: Path.expand("../assets", __DIR__)]
+    ],
+    live_reload: [
+      patterns: [
+        ~r"priv/static/assets/.*(js|css)$",
+        ~r"priv/static/wasm/.*(wasm|js)$",
+        ~r"lib/live_svelte_wasm_web/(live|components)/.*(ex|heex)$",
+        ~r"assets/svelte/.*(svelte)$"
+      ]
     ]
-  ]
+end
 
 config :logger, level: :info
 config :phoenix, :json_library, Jason
